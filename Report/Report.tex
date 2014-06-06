@@ -62,8 +62,8 @@
 %%% END Article customizations
 
 
-\title{Report \\ Automatic Polyphonic Piano Music Transcription}
-\author{Agnieszka Szefer}
+\title{Report \\ Bittorrent camouflage for Tor traffic}
+\author{Dan Cristian Octavian}
 %\date{} % Activate to display a given date or no date (if empty),
          % otherwise the current date is printed 
 
@@ -83,7 +83,21 @@
 %%%%% INTRODUCTION %%%%%
 
 \section{Introduction}
-This chapter outlines the motivation behind the project, its main objectives and contributions. At the end of the section we describe a general outline of the report. 
+
+ “If you have something that you don’t want anyone to know, maybe you shouldn’t be doing it in the first place”. Now, wouldn’t you hire the guy who said this to manage the surveillance system in your totalitarian state? I would, but you better prepare a fat paycheck because he’s the ex-CEO of Google. We are in a time when there’s a lot of talk about privacy and anonymity, because we are in a time where these things are becoming increasingly hard to attain. Most choose not to care, since all is good for the moment, and find the above quote comforting. A few find it alarming, though, because of its impactful indirect implications.
+
+There’s an old book written by a Chinese general, called Sun Tzu, full of reasonable advice about to conduct warfare and, unsurprisingly, a lot of his advice is about how having correct information about your opponent and depriving him of it is the key to victory. Wartime or not, having access to information and the ability to manipulate it and analyze it grants you great power. One would argue that a state’s secret services will use this power to protect its citizens. But once you build a tool that gives you such power, it’s also easy to abuse it or let it slip in the wrong hands.
+
+Since 1988, China has been operating a censorship and surveillance system, codenamed Golden Shield which censors Internet access, observes communications to enforce its totalitarian laws thus depriving its citizens’ of their basic human rights. It is today’s most significant example of things gone wrong with information power tools. Similar situations can be found in Iran or Syria. All these states resort to building censorship and surveillance firewalls, monitoring and manipulating communications between endpoints in their country and the outside.
+
+The problem at hand is of findings ways around these censorship and surveillance systems, to allow people subject to them to access the internet freely and not get caught in the process. Simple solutions such as proxies and VPNs are no longer viable and more sophisticated methods are required. 
+
+This project’s aim is to build a solution to this problem that integrates with the anonymity network Tor by allowing censored users to access the Internet through Tor and avoiding firewall detection by camouflaging Tor traffic as Bittorrent traffic. The idea is to find a cover traffic that goes undetected by filters, has a good throughput and is unlikely to be blocked.
+
+Using Bittorrent traffic as a cover is a promising choice since it is the most prevalent protocol when it come down to upstream traffic and overall the 3nd most prevalent after HTTP and video streaming (in terms of volume of data) ([1] Sandvine, 2013). it has the property that it has a large throughput both downstream and upstream and transports content fit for steganography (eg. video files). Its popularity makes it unlikely to be a target of blocking and doing so would be considered an extreme measure.
+
+The project seeks to also address the issue of Tor proxies using this cover channel being actively probed by scanners seeking to blacklist them through the use of a secret token presented as proof the the client contacting the proxy is to be trusted.
+
 
 \subsection{Motivation}
 Even after millions of years of evolution of our sense of hearing it is still very difficult for a human without any prior musical education to tackle the problem of transcribing music, i.e. writing down the notes that make up a given piece of music. Furthermore, transcribing complex music pieces is a time-consuming task. Even for naturally talented people it may take several attempts to transcribe a whole piece correctly.
@@ -118,21 +132,154 @@ In this report we complement the state of the art in automatic music transcripti
 %%%%%%%%%%%%%%%%%%
 %%%%%BACKGROUND%%%%%
 \section{Background}
-This chapter introduces some concepts necessary to understand this project. We provide background in the area of digital signal processing and piano music.
-We also describe the state of the art in the field of automated music transcription. 
+
+This section covers the information needed to understand this project, assuming no prior w to knowledge about anonymity networks and censorship circumvention schemes but general knowledge about networks and encryption.
+
+I am going to discuss the following topics:
+
+\begin{itemize}
+\item the Tor anonymity network - how it works, what is its purpose
+\item surveillance and censorship firewalls - case studies of censorship firewalls in China and Iran 
+\item Tor censorship circumvention schemes - what mechanisms does Tor currently provide for defeating the above mentioned firewalls
+\item the need for a better tor traffic camouflage
+\end{itemize}
 
 %% Sound %%
-\subsection{Sound}
-Musical instruments or any other sources generate vibrations that are propagated through air or other medium in a form of a waveform. These vibrations are commonly known as \textit{sounds} and we are able to hear them because of the changes in the air pressure in our ears. If the pressure varies according to a repeating pattern we say that the sound has a \textit{periodic waveform} \citep*{Roads1996}.
+\subsection{The Tor anonymity network}
+Tor is a an anonymity network and a software that allows its users to defend against traffic analysis, a network surveillance technique meant to gather information about a user’s online activity. By using Tor, an individual achieves online anonymity. ([2] Tor project, 2014)
 
-One such pattern repetition is called a \textit{cycle}, and the \textit{fundamental frequency} is the number of cycles that occur per second. The frequency is measured in units of Hertz, where 1Hz means one cycle per second. The \textit{period} of a waveform is the lenght of the cycle and as it increases the frequency decreases.
+\subsubsection{Purpose}
+Why would one need such a service? Suppose you are interested in accessing a website which is blocked by your ISP (ex. Pirate Bay). On the wild side, suppose you are government worker in an oppressive state and want to play the whistleblower role and contact outsiders to reveal secret information, action which could compromise your personal safety. Tor is an appropriate tool for this kind communication since it allows you to keep your communication anonymous: eavesdroppers will not be able to know who you are contacting over the network and your destination cannot know who you are either.
 
-Humans are usually able to hear frequencies in the range between 20Hz and 20000Hz.
+What does Tor effectively offer to users? Why does one need more security than that offered by encryption? It is because encryption hides the data payload of internet packets, while the headers of the packets are visible to any eavesdropper in the network. The packet headers reveal source, destination, size and timing. Tor allows a user to hide this information as well. The receivers of the packets themselves do not know the sender identity either.
 
-\subsubsection{Sound Wave Representations}
-One way of representing a sound waveform is as a time-domain graph showing how the air pressure changes over time (see Figure ~\ref{fig:representations}). The \textit{amplitude} is the maximum displacement of the wave measured from its equilibrium position.
+Understanding adversary capabilities and intentions gives a more clear image of what privacy protection problems Tor is trying to solve. A traffic analyzer may spy by just sitting somewhere between the source and the destination of the package and observe the packet headers to learn about information exchanges between the parties. It may be more sophisticated and observe multiple parts of the Internet and throw in statistical analysis to track the communications of individuals/organizations.
 
-A waveform may consist of not only the fundamental frequency, but also many other frequencies. The frequency-domain representation, also called the \textit{spectrum}, shows the frequencies that contribute to the sound (see Figure~\ref{fig:representations}). Any frequency component is a \textit{partial}. A partial that is an integer multiple of the fundamental frequency is called a \textit{harmonic}. If we assume a fundamental frequency of 440Hz, its second harmonic is 880Hz, third harmonic is 1760Hz, etc. Any frequency higher than the fundamental frequency is an \textit{overtone} (see Figure~\ref{fig:partials_harmonics}).
+\subsubsection{How it works}
+
+To understand how Tor works, it is useful to think of it as trying to hide from someone who is following you by using a convoluted path and covering your tracks. Thus, when communicating through Tor, your data follows a random path, moving from one Tor network node to another until it reaches its destination.
+
+Data packets travel from source to destination through the Tor network on what is called a circuit. A circuit is composed of a chain of relays (machines which are part of the Tor network). Each relay in the circuit knows only about the relay before it and the one after it. Thus none of them know the entire path of the data they are transporting. A different set of encryption keys is negotiated by the client for each hop in the circuit so that no relay in the chain can track communications flowing through it. 
+
+The above techniques ensure that an eavesdropper sitting between any 2 relays in a circuit cannot deduce any of the information normally given away by headers. Eavesdropping right at the source or right at the destination only reveals that some unknown packet is going into Tor or some unknown packet is exiting Tor, respectively.
+
+The nodes which compose the Tor network are run entirely by volunteers and the diversity of these volunteers is another aspects which works to enforce the privacy guarantees of Tor. Since Tor nodes are spread across the globe and belong to a series of individuals/organizations and every communication through Tor follows a circuit composed of multiple relays, it is very difficult for one entity to be able to monitor the users of Tor.
+
+\subsubsection{Issues and potential attacks}
+
+However, one can argue that Tor security guarantees may be compromised by an adversary who owns a large amount of nodes in the Tor network or who monitors traffic going into and exiting the network to make statistical correlations. This is an acknowledged weakness of the system and it is a an accepted fact that Tor cannot face a state-level adversary with large resources and great reach. Despite this Tor has a large array of use cases. For example, using Tor to run a criminal organization and hide from the US government is an approach doomed to failure due to their computational and monitoring capabilities. An adversary such as the US has the resources to analyze the network and the influence necessary to monitor the Internet traffic in a variety of places, perhaps outside its national borders.
+
+Much research has gone in evaluating the effectiveness of traffic correlation attacks on the Tor network, which can be put to use as described above. The most recent paper on the subject is the most authoritative ([3] Aaron Johnson, 2013) and it reveals that this attack is more potent than previously believed. The authors develop a framework for analyzing the vulnerability of Tor against attackers owning IXP coalitions or/and being part of the actual network.
+
+\subsubsection{Tor as a censorship circumvention tool}
+
+An interesting use case of Tor is that of using it a censorship and surveillance circumvention tool in countries where Internet access is subject to surveillance such as China and Iran. One could argue that this is a situation where the Tor network is facing a state level adversary and the effort is futile. However, these states tend to be isolated islands to the rest of the world which opposes their policies. This kind of adversary is limited to performing traffic analysis on all incoming and outgoing national traffic, having not much reach outside its borders. Therefore the problem of using Tor to bypass surveillance is reduced to that of finding a way of penetrating their firewall.
+A central element of Tor censorship circumvention tools is the Tor bridge. Currently all Tor relays are publicly available. Any censoring adversary who wants to prevent the use of Tor could trivially block access to these machines. That is why there exists a set of Tor nodes which are not publicly available and their addresses can only be obtained through other methods such as providing proof life or communicating with the owner of the bridge. 
+
+
+\subsection{Surveillance and Censorship firewalls}
+
+The problem at hand is that of developing a mechanism for allowing people to bypass internet surveillance and censorship systems, as part of  the Tor project. This means that such a mechanism aims to defeat a black-box adversary whose resources and techniques are unknown but can be intelligently estimated/guessed. In this section I will go over the necessary background knowledge about this adversary, focusing mostly on China, the owner of the most sophisticated Internet censorship system in the world ([4] OpenNet, 2013), and briefly discussing others such as Iran.
+
+\subsubsection{Observations}
+
+The adversaries aim to inspect information flowing in and out of the state they are operating in, tamper with it and block it as they see fit. They are interested in seeing which are the parties involved in the information exchange, and even though the actual content may be protected by encryption, data about source, destination, timing, size is easily accessible. Furthermore, they have passive and active systems which aim to defeat surveillance and censorship circumvention mechanisms, such as Tor. All of this is achieved by China with the Golden Shield Project (also known as the Great Firewall of China - GFW). ([5] HikingGFW, 2013)
+
+For the purpose of censorship, adversaries employ a series of methods ([6] Zittrain and Eldman, 2003):
+
+\begin{itemize}
+\item filter based web server IP address - access to certain IP addresses is denied. All IP based protocols are affected. This is implemented most likely with block lists loaded onto border routers
+\item filtering based on DNS IP address - access to DNS servers with certain IPs is denied. May be easier to circumvent if the user has the IP of his target webserver and does not require a name resolution. Most likely uses the same implementation as above.
+\item DNS redirection - DNS servers in China resolve domain names to web server addresses other than the official ones ([10] Lowe, 2007)
+\item filtering based on keywords in the URL - requests are blocked whenever the URLs contain certain keywords. This is most likely implemented with packet-filtering systems integrated with the border routers.
+\item filtering based on keywords present in the HTML response - packets are blocked based on the content of the response. This is a strong argument for the presence a packet filtering system.
+\end{itemize}
+
+It was shown that the GFW employs techniques that may be easy to circumvent but the circumvention will not go unnoticed - which highlights an important goal of this project: bypassing the firewalls should go unnoticed. The paper “Ignoring the great firewall a China” ([7] Clayton,  2006) features an experiment which proves that GFW attempts to kill an undesired connection by sending forged TCP reset packets both ways. The authors were speculating that it uses an offline packet analysis system to decide whether a connection is to be dropped or not. Both parties could theoretically choose to ignore the reset message and continue the exchange. However, the surveillance system could easily log this event and pursue an investigation on the communication endpoint located in China.
+
+To circumvent the censorship methods, the most natural tactic is to use a VPN or proxy. However, this is no longer a viable alternative. VPN connections are often now blocked ([8] The Guardian, 2012) which proves GFW is detecting and then killing connections to VPNs or proxies ([5] HikingGFW, 2013). Circumvention tools based on proxies (Ultrasurf, Psiphon) now need to rotate IPs constantly since their servers are continuously blocked. It is very likely that the Golden Shield Project developed tools for detecting VPN, SSH, TLS/SSL traffic and also explicitly analyzes circumvention tools in order to fingerprint their traffic so that they can block them.
+
+According to the paper “How the great Firewall of China is blocking Tor” ([9] Winter, 2012) the GFW is taking strong measures to prevent the use of Tor by its citizens. This is the most extensive study on the issue of Tor blocking in China. Apart from the most obvious measures such as blocking all public relay addresses and all web servers associated with the Tor project, GFW is blocking the Tor bridges as well. For example, the pool of bridges which are obtained by providing proof of life (captcha solving) on a Tor website is blocked entirely. 
+
+Moreover, their experiment, which involved pretending to be a tor client in China, showed GFW is actively probing machines on the web to see if they are Tor bridges. The authors conjectured that DPI (deep packet inspection) boxes are being used to discover packets that are potentially tor packets. Suspect network connections get their addresses placed in a queue. These addresses are later automatically scanned by connecting to them through the Tor protocol. If the machines respond as a Tor bridge would, they are blocked.
+
+Based on the study of the IPs of the Tor bridge scanners, the authors were lead to believe that an IP spoofing scheme is used to hide the origin of the scanners. Therefore, any attempt to distinguish between an honest IP and a scanner IP based on the address alone is unlikely to succeed. 
+
+The speculated surveillance systems described above seemed to have flaws and peculiarities: some Tor relay directories were not blocked, some tor bridges never got blocked or got unblocked after a while after exhibiting tor activity. Nonetheless, an intent to minimize collateral damage was observed, since undesired connections were dropped for (address, port) tuples meaning IPs weren’t blocked entirely.  My belief is that in searching for a solid solution, one cannot rely on these small failures or indulgences. They can be exploited for short term gains, but a real solution to the problem should assume an adversary which has the above capabilities perfected.
+
+\subsubsection{Adversary sketch}
+
+Given the all the information gathered when reverse engineering the GFW and assuming an adversary with vast resources I am sketching the model of the adversary in the following way:
+
+\begin{itemize}
+\item has the capability of observing all traffic exiting and entering its national borders
+\item has complete control over its internal network infrastructure from ISPs to DNS servers, being capable  of techniques such as IP spoofing
+\item all packets it observes can be subject to DPI 
+\item it has the ability to run sophisticated statistical analysis at a large scale
+\item it has active probing capabilities 
+\item it is willing to block large amounts of traffic and important Internet players (eg. China blocked Google on numerous occasions)
+\item its automated computations can be augmented by Mechanical Turk - style human supported task solving systems (eg. to solve a large number of captchas)
+\item it has the authority to inspect all the machines on its national territory
+\item the adversary draws great value from merely finding out the 2 parties involved in an exchange and not necessarily blocking; based on this information it can take the investigation forward and 
+\item interacting with it is analogous to examining a quantum state, in the sense that the observation affects the outcome. For example, running experiments to test the effectiveness of circumvention techniques may trigger defensive responses on the part of the adversary.
+\item it is very hard to prove the effectiveness of a technique against it since merely getting data across its firewall is not a proof of success - the adversary may have the capability to block but it might just be observing silently
+\item changes to the infrastructure tend to be quite slow and expensive since they happen at the level of a huge state
+\end{itemize}
+
+\subsection{Existing solutions}
+
+This section covers the existing techniques for solving the problem at hand, discussing the ones provided by Tor, companies and other open initiatives.
+ 
+Since traditional VPN/proxy based solutions are quickly becoming obsolete due to the adversary blocking such connections, more sophisticated systems have been developed using techniques various techniques such as large numbers of rotating changing proxies, hidden proxies shared through more secure channels (Tor bridges) and traffic obfuscation/camouflage.
+
+\subsubsection{Private company solutions}
+Censorship circumvention solutions developed by companies deserve attention, even though they are often overlooked in the papers from the research community. The ones worth noting are Ultrasurf and Psiphon. Both companies developed systems which expand on the traditional model of using a proxy, but throw in techniques such as rapidly rotating IP addresses of their proxy servers to a ensure there is a set of unblocked proxy servers at all times and some connection obfuscation techniques.
+
+Both Ultrasurf and Psiphon ([11] Ultrareach, 2013) ([12] Psiphon, 2013) employ a fleet of proxy servers, and bootstraps the client software with a set of addresses of proxy servers, allowing for further discovery of other proxies as the old ones get blocked. Psiphon aims for a simplified client experience, offering also a no-installation solution through a web app for the sake of leaving no trace on the user’s machine. Ultrasurf states guarantees about the absence of traces as well. Psiphon’s  more interesting feature is its traffic obfuscation technology. It features multiple channels for transmitting data: VPN, HTTP, ssh and obfuscated ssh, switching from one to another in an attempt to find one that is not detected by the firewall based on the user’s use case.  It It argues its effectiveness based on its popularity claiming 260 million + pages have already been served using siphon. Ultrasurf boasts about supporting traffic worth of millions of pages daily.
+
+Both these services are closed source and lack transparency, while one of them has been shown to have serious issues. Ultrasurf has received the attention of security expert Jacob Appelbaum who wrote a paper (Technical analysis of the Ultrasurf proxying software) about his analysis of Ultrasurf through reverse engineering and discussions with the developers. According to his findings their software has numerous flaws, from non-up to date servers thus vulnerable to external attackers, lack of forward secrecy and overstated effectiveness (their proxy servers are often blocked in censoring countries) and their easy to filter bootstrapping process. Thier log retention policies are dubious at best, and they acknowledged to have submitted logs to the US government. 
+
+My take on the case of these companies and their services is that their model has inherent flaws.  The closed source nature of these project means the entire responsibility of the software’s security is taken up by the company itself, since no research community can peer review it, this being an unwritten standard in the security world. Secondly, they act as single hop proxies and most likely keep logs, meaning that if an attacker gains control of a proxy he can see both source and destination of all traffic flowing through it. Moreover, none of them employ any solid method for avoiding their traffic being fingerprinted and easily blocked.
+
+\subsubsection{Tor solutions}
+
+In the context of the Tor project, research has been focusing on finding ways of hiding the Tor traffic from filtering and on avoiding tor bridge blocking. These efforts came as a direct response to the effort of GFW to filter Tor traffic through DPI and perform active probing on Tor bridges.
+
+The general approach of the Tor project has been to favour the easy development of surveillance and censorship circumvention mechanisms in order to obtain a set of reliable solutions which can be used interchangeably based on what works best in a certain situation. Thus, the project now encompasses Obfsproxy, a framework for developing pluggable transports, traffic transformers meant to make the Tor traffic undetectable. The most notable pluggable transports at this moment are ScrambleSuit, StegoTorus, Skypemorph, Dust and Format-Transforming Encryption ([13] Tor project, 2013). Flashproxy is another popular tool in the anti-censorship arsenal, which does not provide a cover for the traffic but offers a solution to the bridge blocking problem.
+
+\myparagraph{Proxy blocking solutions}
+
+Even though the focus of this project is to find camouflage traffic for Tor, it is useful to look at Flashproxy ([14] Fifield, 2012) as it can combined with existing filtering circumvention techniques. The main idea behind it is to generate many ephemeral proxies for Tor traffic so that blocking them is a large effort which is almost pointless since they are short lived and quickly replaced by others. The neat trick used to achieve this is relying on random internet users to become proxies for a short time by running a Javascript script in their browser which proxies traffic from Tor clients to Tor relays. The script can reach a user’s machine by being embedded in a page served by a collaborating website. 
+
+\myparagraph{Traffic filtering circumvention}
+
+Most traffic filtering avoidance projects rely on the idea of camouflaging traffic under other types of traffic, and sometimes making use of steganography to hide the payload. Some rely on creating look-like-nothing traffic. Most of the ones that are using camouflage are simply mimicking the target protocols and this is shown to be a flawed approach in the paper: “The Parrot is Dead: Observing Unobservable Network Communications”([15] Houmansadr, 2013). We shall discuss each in turn and highlight their good and bad parts.
+
+Skypemorph ([16] Moghaddam, 2012) is classical example of a pluggable transport that uses camouflage to avoid detection by packet filtering systems. The idea behind it is simple: use a Skype connection as a covert channel for Tor traffic and send Tor packet data instead of voice data. The implementation of this system was from simple though: the authors took an approach through which they combine the use of the Skype client for handshakes and a separate application which mimics the Skype protocol but instead sends Tor data packets. This choice of cover channel provides high throughput but the task of imitating Skype and, in general, any fairly complex protocol, is non-trivial and prone to errors. We will see further on how this is potentially a great vulnerability.
+
+Stegotorus ([17] , 2012) acts as a framework for developing pluggable transports which make use of steganography. It provides a novel way of encryption fit for use with steganography, a generic architecture meant to fit any steganographic cover protocol and 2 proof-of-concept steganography modules. It also provides a systematic way of attacking their pluggable transport to demonstrate its resilience. The ideas behind the novel encryption scheme, the framework and the attacks are good, but the steganography modules are vulnerable to trivial fingerprinting as shown in the paper “The Parrot is Dead”. Furthermore, the bandwidth of the cover channel using a HTTP steganography module is quite low (30kb/s).
+
+Scramblesuit ([18] , 2013) takes a different approach from the aforementioned and does not attempt to mimic an existing type of traffic and creates look-like-nothing cover traffic which looks random, in line with the idea that a imitating existing types of traffic is likely to fail. They pay great attention to their traffic shape so at to make it non-fingerprintable. Their approach also has much better network throughput than others. The one great weakness of the authors’ approach is that their tool will be completely blocked off by a whitelisting censor, since their type of  traffic is classified as unknown.
+
+Dust ([19] Wiley, 2013) provides a packet based DPI resistant protocol, as opposed to connection based. It acts as an engine for generating protocols to defeat filtering. It makes packets follow a certain format (perhaps based on an existing protocol) and makes packet size follow a defined distribution. However, unlike scramblesuit, it does not take into consideration packet interarrival times. Nonetheless, it allows for something clever, namely configuring the statistical properties of the encrypted content in order to avoid attacks such as measuring entropy which could detect normal encrypted text by its high entropy.
+
+“The parrot is dead: Observing Unobservable Network Communications” is a clever paper which finds flaws in existing proposed filtering circumvention systems. It managed to find efficient and simple ways of fingerprinting Stegotorus modules, Skypemorph and Dust through of combination of packet inspection and active probing. The point of the paper is to state that imitating cover protocols is doomed to fail and that a better option is to ride on “real” traffic generated by the software using the protocol. I believe they make a valid point and all future camouflage transports should take this into consideration.
+
+\myparagraph{Need for better protection against traffic filtering}
+
+As we have seen from the discussion in the previous sections, there is no robust long-term solution at this point for avoiding traffic filtering and “smuggling” tor traffic unnoticed through the Firewall of a competent adversary. It is true that many of the current solutions will work for the current state of things, but further research has shown that if the attacker improves his DPI algorithms and combines them with active probing he can defeat them. Furthermore, the idea is to develop a set of such solutions and choose which fits best each use case.
+
+It is important to point out  that this is a continual arms-race and future solutions are unlikely to be a silver bullet. Any solution that puts us in front of adversary or forces the adversary to invest large amounts of resources and time is a good one. For example, if a circumvention strategy requires the adversary to do massive infrastructure upgrades to counter it - consuming time and money, it is an important step forward.
+
+\section{Evaluation}
+
+The evaluation of this project is tricky. Ideally we would like to answer the question of whether this covert channel does good a good job at avoiding filtering by censorship firewalls. Testing in a real life situation is irrelevant, because at the time of writing, no detection method is yet deployed by adversaries, since it is a completely new covert channel and adversaries will make no effort to block it until it is deployed at scale by the Tor network.
+
+We would want to know what is the detection rate of the pluggable transport what resources are needed to perform detection and what are performance costs of the covert channel (the resulting bandwidth).
+
+A way of evaluating it is for the author to take up the role of the attacker and devise attacks to measure their effectiveness. Based on the design of my pluggable transport, I will be creating packet analysis techniques meant to detect whether a bittorrent connection hides Tor traffic. I will further evaluate the costs of deploying and running such as solution at scale by the adversary. 
+
+Furthermore, expanding on the idea of playing the role of the adversary, I would post my solution to security communities and challenge them to hack it. I was planning to organize a local university event as well in the form of a hackathon and participants will be ranked according to their detection success rate and perhaps computational resource utilization and awarded prizes accordingly. The main goal is to get the designed reviewed and hacked to make it as bulletproof as possible or maybe, if it proves fundamentally flawed, discard it.
 
 \begin{figure}[h!]
 \begin{center}
