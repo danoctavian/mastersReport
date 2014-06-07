@@ -34,6 +34,7 @@
 % package for code snippets
 \usepackage{listings}
 
+% code snippet configuration for haskell
 \lstset{frame=tb,
   language=Haskell,
   aboveskip=3mm,
@@ -377,12 +378,14 @@ As we saw above, using a BitTorrent client to generate transport traffic involve
 \begin{itemize}
 \item socks proxy configuration
 \item Adding a torrenfile/magnet link
-\item control per torrent file pausing, resuming, upload/download speed
+\item control per torrent file pausing, resuming, upload/download speed, adding peers
 \end{itemize}
 
 To fully achieve the goal of creating indistinguishable BitTorrent traffic, the sum of the usage share of the BitTorrent clients employed by the system needs to be high. To undestand this, think about the extreme situation in which the system uses only one particular obscure BitTorrent client with a 0.1\% market share, in which case the adversary can focus his detection efforts on the connections which involve only those particular clients, as deduced from the plaintext handshake of the BitTorrent protocol.
 
 Given the requirement above, the system is designed to support multiple types of BitTorrent clients which in turn are required to support the features mentioned above to allow for control and proxying. For this purpose, a general BitTorrent client interface was designed, which requires implementations for each client. The current codebase contains control modules for the UTorrent client and the Deluge client. The UTorrent client  was chosen since it comes up as being either the first or second most popular client based on information collected by trackers, while the Deluge client was selected because its deluged daemon is ver configurable allowing for fine-grained control, making it the best fit for initial prototyping and demos. 
+
+The following snippet shows the Haskell  data type associated with a BitTorrent client connection: 
 
 \begin{lstlisting}
 data TorrentClientConn
@@ -400,7 +403,47 @@ data TorrentClientConn
 The tools involved in developing the system
 
 \subsubsection{Programming language}
+
+When choosing the programming language for the project the main criteria were:
+
+\begin{itemize}
+\item is high-level
+\item favors code reuse
+\item favors correctness and security
+\item has reliable network, concurrency, cryptography libraries
+\item the language toolchain (compiler/interpreter, profiler) allow you to produce efficient code in terms running time and space performance
+\end{itemize}
+
+Haskell is a high-level purely functional language that is advertised as being good for the rapid development of correct, robust software. It's type system is both flexible and powerful allowing you to write code that is concise and reusable while at the same time subjected to a great deal of compile time checks.
+
+The fact that the Haskell toolchain allows for writing of performant network applications has been proved empirically by the creation network applications such as the Warp HTTP web server whose performance exceeds that of other modern networking applications (node, tornado, php) \citep*{web:warpCrossBenchmark}.
+
+As for the availability of libraries, the choice of programming language was not the correct one in terms of prototyping and quick results. I believe Python would have been the obvious correct choice. If I were to choose Python the following libraries/modules would have been available:
+
+\begin{itemize}
+\item Twisted networking engine 
+\item socks proxy server
+\item Extended OrPort protocol  
+\item BitTorrent protocol parser
+\item REncode
+\item deluged RPC API 
+\item uTorrent RPC API
+\end{itemize}
+
+The parsing, encoding and protocol modules above needed equivalent implementations in Haskell. 
+
+Not only this but Python, being high-level, dinamically typed, and generally well designed, is a very good choice for prototyping and writing programs whose final shape is not known and where signficant design changes happen while implementing. It can be argued that this was the case for this system.
+
+Two other aspects which greatly affected productivity but were not amongst the main considerations when choosing the programming language were \textit{familiarity} and \textit{learning curve}. I was moderately familiar with Python and it has a short learning curve, while I was a beginner Haskell programmer and the language has a significantly longer learning curve. Thus, a lot of the time spent on the project was invested in learning Haskell.
+
+
+
 \subsubsection{Libraries}
+
+On the flip side, the Haskell libraries that are available are reliable and efficient.
+
+There are  
+
 \subsection{Tor integration}
 \subsection{Modules}
 
