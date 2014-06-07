@@ -11,7 +11,45 @@
 \usepackage[colorlinks]{hyperref}
 \usepackage[colorinlistoftodos, textwidth=4cm, shadow]{todonotes}
 
+% makes paragraphs have no identation and a space between them
+\usepackage{parskip} 
 
+
+% text coloring
+\usepackage{color}
+
+% color definitions
+
+\definecolor{blue}{RGB}{0,0,255}
+\definecolor{green}{RGB}{0,255,0}
+\definecolor{purple}{RGB}{204,0,102}
+
+% code snippet colors
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+
+
+% package for code snippets
+\usepackage{listings}
+
+\lstset{frame=tb,
+  language=Haskell,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true
+  tabsize=3
+}
 
 \usepackage[utf8]{inputenc} % set input encoding (not needed with XeLaTeX)
 
@@ -100,30 +138,13 @@ The project seeks to also address the issue of Tor proxies using this cover chan
 
 
 \subsection{Motivation}
-Even after millions of years of evolution of our sense of hearing it is still very difficult for a human without any prior musical education to tackle the problem of transcribing music, i.e. writing down the notes that make up a given piece of music. Furthermore, transcribing complex music pieces is a time-consuming task. Even for naturally talented people it may take several attempts to transcribe a whole piece correctly.
-
-Automating the process of music transcription could be therefore of great help to musicians, especially to those lacking the skill of transcribing a piece `by ear'. There are large amounts of music that are not available in an annotated form. This includes traditional music passed from generation to generation or just released popular songs. Furthermore, there is an increasing community of people interested in learning how to play a piece from sheet music.
-One of the most interesting applications of automated transcription is real time or offline feedback for music students. A student could see if what he or she plays is correct in respect to the sheet music he or she was given. \todo[inline]{Reference to Music Prodigy}%
-\todo[inline]{Why piano music}%
 
 \subsection{Objectives}
-The aim of this project was to create an end-to-end system for automated transcription of piano music. In particular, we focused on correct detection of polyphonic music, it.e. where more than one note can be played at a time. We also investigated current state of the art methods for pitch detection and looked for ways to improve them in our system.
-\todo[inline]{Improve the last sentence.}%
+
 
 \subsection{Contributions}
-In this report we complement the state of the art in automatic music transcription with the following contributions:
 
-\begin{itemize}
-\item We present an end-to-end solution to automatic music transcription. \todo[inline]{Can this be a contribution?}%
-\todo[inline]{with user inferface maybe?} %
-\item We introduce two techniques for finding noise threshold (one using least squares approach and another the total spectrum of significant spectral peaks) that improve the detection of pitch candidates.
-\item We filter out insignificant spectral peaks in an early stage of transcription what improves the speed of pitch detection. \todo[inline]{Does it count as a separate contribution?}%
-\item We show that using one FFT instead of commonly used STFT for each sound frame is `good enough' for pitch detection in our system and also requires less computations.
-\item We experiment and test using real life data recorded by the author, where most of research papers test on studio recorded data.
-\item We use user input data for better noise estimation and more accurate pitch detection. \todo[inline]{Is this a separate contribution?}%
-\item We present challenges encountered in the development of the system and explain how we overcame them.
-\item We evaluate our system and show its limitations, and suggest ideas for future work that could improve current transcription solutions.
-\end{itemize}
+
 
 \subsection{Report Outline}
 \todo[inline]{Describe report outline}%
@@ -271,6 +292,118 @@ As we have seen from the discussion in the previous sections, there is no robust
 
 It is important to point out  that this is a continual arms-race and future solutions are unlikely to be a silver bullet. Any solution that puts us in front of adversary or forces the adversary to invest large amounts of resources and time is a good one. For example, if a circumvention strategy requires the adversary to do massive infrastructure upgrades to counter it - consuming time and money, it is an important step forward.
 
+\section{Security goals}
+
+\section{Threat model}
+
+\section{Design}
+
+\section{Implementation}
+
+The goal of the system is to pipe traffic from the Tor client to the Tor bridge and back through the use of the bittorrent traffic as a camouflaging transport channel whick masks the existence of a Tor connection.
+
+The current system implementation provides a reliable communication channel camouflaged as BitTorrent traffic between the client and the server of any client-server model application. This means that even though the current use case of the system is to act as a pluggable transport for the Tor network, channeling traffic between a Tor client and a Tor bridge, it is general enough to be used as a communication channel between any client and server.
+
+The implementation consists of a pair of pluggable transport (PT) client-server processes, each accompanied by a BitTorrent client process under its control, both running alongside their user client and server, respectively. From this point onward we shall refer to the client and server \textit{using} the PT processes to communicate as \textit{user client/server} and their traffic will be called \textit{user traffic}. 
+
+The server and the client communicate through a custom \textit{transport protocol} whose main purpose is to proxy user traffic back and forth. 
+
+The PT client-server processes are implemented in Haskell, a choice justified by the language's powerful type system which helps with achieving correctness and code reuse, and its very good libraries for data streaming and concurrency. Work on the project resulted in the creation of many useful reusable packages that, once refactored accordingly, can hopefully be added to the Haskell official package repository.
+
+
+\subsection{System architecture}
+
+The system architecture follows a client-server model. The client and the server use a separate BitTorrent client process each to generate authentic Bittorrent traffic between each other. Once a peer-to-peer connection is established between the 2 torrent clients the BitTorrent traffic flow starts transporting the user traffic back and forth. The technique used to make the BitTorrent traffic "carry" the user traffic is to replace the payload of \textit{some} of the BitTorrent piece messages with transport protocol traffic. 
+
+
+Figure~\ref{fig:system_architecture} shows the components of the server and the client for the \textit{concrete} use case of the system to create a communication channel between a Tor client and a Tor bridge. These components are the processes that the client and the server run and how connections are made between them.
+
+The client has the following components:
+
+\begin{itemize}
+\item Tor client process which generates the user traffic that needs to reach the the Tor bridge
+\item Pluggable transport client process that accepts connections from the Tor client process and proxies its traffic
+\item Socks proxy facing the Tor client as an interface for proxying the Tor traffic (runs as part of the pluggable transport client) 
+\item BitTorrent client which initiates a peer connection to to the server-side bittorrent client in order to exchange file pieces of a file advertised by the Tor bridge off-band
+\item Socks proxy facing the BitTorrent client which proxies its traffic in order to allow the PT process to read   incoming transport protocol messages and embedd outgoing transport protocol messages (runs as part of the PT client) 
+\end{itemize}
+
+The server has the following components:
+
+\begin{itemize}
+
+\item BitTorrent client waiting to receive peer connections that will "carry" the transport protocol traffic; 
+\item Reverse proxy for the incoming BitTorrent connections to the BitTorrent client living on the server-side (runs as part of the PT server process)
+\item Pluggable transport server process that watches all incoming Bittorrent connections hitting the reverse proxy and selects the Tor client ones to proxy further to the Tor bridge
+\item Tor bridge which receives incoming connections from Tor clients in order to relay their traffic through the Tor network; in this setting the traffic from its clients is proxied by the PT server process process which opens connection the the Tor bridge using the ORPort protocol
+
+\end{itemize}
+
+
+The distinction is made between the 3 types of traffic:
+
+\begin{itemize}
+\item Tor traffic (\textcolor{blue}{blue}) is generated by the Tor client and Tor bridge and flows back forth to the plugabble transport process which wraps it in the transport protocol traffic 
+\item Transport protocol traffic (\textcolor{purple}{purple}) is generated by the plugabble transport process and embedded in the BitTorrent traffic
+\item  BitTorrent traffic (\textcolor{green}{green}) is flowing over the network and through the adversary firewall between the the 2 bittorrent clients while being subject to inspection and tampering by the Socks and reverse proxies in order to read and embed the incoming and respectively outgoing transport protocol traffic 
+\end{itemize}
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.23]{FuinSystemArchitecture}
+\end{center}
+ \caption{System overview}
+ \label{fig:system_architecture}
+ \end{figure}
+
+\subsubsection{The life of a Tor data byte}
+
+In order to better understand how the whole data channel works we will describe step by step, the lifetime of a data byte after it is sent by the Tor client and until it reaches the Tor bridge. This is described assuming the whole connection has already been established and intiation/handshaking completed. Note that for all other purposes the data is reasoned about as a stream, but we look at a single byte to understand the flow.
+
+A byte is sent by the Tor client process to the Tor bridge. It is proxied to a localhost socks proxy that the Tor client is configured to use. It is then picked up by the PT client process who controls the socks proxy. The PT process then waits for a BitTorrent piece to take the byte over the network. The PT process runs another socks proxy facing the Bittorrent client. It can thus see all incoming and outgoing BitTorrent messages going through a connection \textit{initiated} by its BitTorrent client. When a piece message created by the \textit{local} BitTorrent client is seen by the PT process, it tampers with its contents, removes its old content (a part of the file it was transporting) and inserts the byte encrypted.  
+
+The BitTorrent message travels across the network through the adversary's firewall (hopefully unseen, unheard) and reaches the server machine. It is then proxied through the reverse proxy standing in front of the BitTorrent client living on the server side. This reverse proxy is owned by the PT server process which looks at all incoming piece messages to see if they are holding transport protocol payload. When the travelling byte's message reaches it, it decrypts the whole payload, extracts the byte, sends the piece further on to the server-side BitTorrent client. It then sends the byte through the open Extended ORPort connection to the Tor bridge process running locally.
+
+In a similar, but not identical way (since there is assimetry between the client and server) a byte travels from the Tor bridge to the Tor client.
+
+\subsubsection{BitTorrent client interaction}
+
+A critical design choice of this project is that to use a \textit{real} BitTorrent client to generate BitTorrent traffic between the client and the server. This choice was made in order to obtain an authentic BitTorrent traffic pattern that is indistinguishable from genuine traffic. However, this came with the tradeoff of a more complex implementation.
+
+As we saw above, using a BitTorrent client to generate transport traffic involves proxying its connection with a socks proxy on the client (because it's an outgoing connection) and a reverse proxy on the server-side (because it is an incoming connection). Furthermore, in order to correctly read and tamper with the BitTorrent messages, the entire stream of the BitTorrent connection is parsed and then serialized back on its way out of the proxy. 
+
+ The BitTorrent client in use needs to be controlled by the PT process. Therefore, the client needs to support the following actions in an automated fashion (i.e. exposing a network API/command line interface):
+
+\begin{itemize}
+\item socks proxy configuration
+\item Adding a torrenfile/magnet link
+\item control per torrent file pausing, resuming, upload/download speed
+\end{itemize}
+
+To fully achieve the goal of creating indistinguishable BitTorrent traffic, the sum of the usage share of the BitTorrent clients employed by the system needs to be high. To undestand this, think about the extreme situation in which the system uses only one particular obscure BitTorrent client with a 0.1\% market share, in which case the adversary can focus his detection efforts on the connections which involve only those particular clients, as deduced from the plaintext handshake of the BitTorrent protocol.
+
+Given the requirement above, the system is designed to support multiple types of BitTorrent clients which in turn are required to support the features mentioned above to allow for control and proxying. For this purpose, a general BitTorrent client interface was designed, which requires implementations for each client. The current codebase contains control modules for the UTorrent client and the Deluge client. The UTorrent client  was chosen since it comes up as being either the first or second most popular client based on information collected by trackers, while the Deluge client was selected because its deluged daemon is ver configurable allowing for fine-grained control, making it the best fit for initial prototyping and demos. 
+
+\begin{lstlisting}
+data TorrentClientConn
+  = TorrentClientConn {
+       addMagnetLink :: (MonadTorrentClient m) => String -> m (),
+       addTorrentFile :: (MonadTorrentClient m) => String -> DB.ByteString -> m TorrentHash,
+       listTorrents :: (MonadTorrentClient m) => m [Torrent],
+       pauseTorrent :: (MonadTorrentClient m) => TorrentHash -> m (),
+       setProxySettings :: (MonadTorrentClient m) => [ProxySetting] -> m (),
+       connectPeer :: (MonadTorrentClient m) => TorrentHash -> HostName -> PortNumber -> m ()
+\end{lstlisting}
+
+\subsection{Tools}
+
+The tools involved in developing the system
+
+\subsubsection{Programming language}
+\subsubsection{Libraries}
+\subsection{Tor integration}
+\subsection{Modules}
+
 \section{Evaluation}
 
 The evaluation of this project is tricky. Ideally we would like to answer the question of whether this covert channel does good a good job at avoiding filtering by censorship firewalls. Testing in a real life situation is irrelevant, because at the time of writing, no detection method is yet deployed by adversaries, since it is a completely new covert channel and adversaries will make no effort to block it until it is deployed at scale by the Tor network.
@@ -281,93 +414,9 @@ A way of evaluating it is for the author to take up the role of the attacker and
 
 Furthermore, expanding on the idea of playing the role of the adversary, I would post my solution to security communities and challenge them to hack it. I was planning to organize a local university event as well in the form of a hackathon and participants will be ranked according to their detection success rate and perhaps computational resource utilization and awarded prizes accordingly. The main goal is to get the designed reviewed and hacked to make it as bulletproof as possible or maybe, if it proves fundamentally flawed, discard it.
 
-\begin{figure}[h!]
-\begin{center}
-\includegraphics[scale=0.6]{TimeDomain}
-\end{center}
-\caption{Time-domain and frequency-domain representations of a sound wave.}
-\label{fig:representations}
-\end{figure}
+\subsection{Theoretical evaluation}
 
-
-\begin{figure}[h!]
-\missingfigure{Fundamental frequency, partials, harmonics and overtones }
-\caption{Fundamental frequency, partials, harmonics and overtones.}
-\label{fig:partials_harmonics}
-\end{figure}
-
-%% Digital Signal %%
-\subsection{Digital Signal}
-Figure~\ref{fig:digital_recording} illustrates the process of digital audio recording and playback. A source generates sound waves. A microphone transduces the air pressure produced by this source into electrical voltages. The voltages are passed to analog-to-digital-converter (ADC). At each tick of the sample clock the ADC converts the voltages into strings of binary numbers.
-
-\begin{figure}[h!]
-\missingfigure{Overview of digital recording and playback see page 23 in Roads1996 }
-%\caption{Overview of digital recording and playback.}
-\label{fig:digital_recording}
-\end{figure}
-
-\subsubsection{Sampling}
-In contrast to the analog signal (see Figure~\ref{fig:analog}), the digital signal is defined only at the points of time it has been \textit{sampled} at. In Figure~\ref{fig:digital} each vertical bar represents one sample of the signal. The \textit{sampling frequency} or \textit{sampling rate} is expressed in units of Hertz. In this project we experimented with signals sampled at the most common sampling frequency: 44.1 KHz with 16-bit samples. 
-\todo[inline]{Mention aliasing and quantization error?}%
-\todo[inline]{Some files were recorded at 48000Hz}%
-
-\begin{figure}[h!]
-\begin{center}
-\includegraphics[scale=0.1]{analog}
-\end{center}
-\caption{Analog representation of a signal \citep*{Roads1996}.}
-\label{fig:analog}
-\end{figure}
-
-\begin{figure}[h!]
-\begin{center}
-\includegraphics[scale=0.1]{digital}
-\end{center}
-\caption{Digital representation of a signal \citep*{Roads1996}.}
-\label{fig:digital}
-\end{figure}
-\todo[inline]{Add labels to the diagrams.}
-
-\subsubsection{WAVE Format}
-\todo[inline]{It may be better to move it to Outline section and explain why this format is better than others.}
-WAVE is an audio file format used for storing audio bitstreams. This format is uncompressed what ensures the highest quality of the recorded sound. Moreover, it is the most general music storage format and can be easily converted to other popular ones such as .mp3. 
-\todo[inline]{Mention stereo (2 channels) vs. mono sound.}
-
-%% MIDI %%
-\subsection{MIDI}
-MIDI is a popular protocol for control of digital music systems that allows for communication between an electronic instrument and a computer. In contrast to a digital audio recorder, a MIDI sequencer does not transmit the sampled waveform of the sound. When a music piece is played on a keyboard, a MIDI sequencer records only the start and ending time of each note, its pitch, and the amplitude of the beginning of a note. Therefore, AaStandard MIDI File (SMF) requires much less storage than .WAV to represent similar data.
-
-For instance, if you play 4 quarter notes at a tempo of 60 beats per minute on a MIDI synthesizer, just 16 pieces of information of this 4-second sound are captured (4 starts, ends, pitches and amplitudes). On the other hand, if you record the same sound with a digital audio recorder set to a sampling frequency of 44.1 KHz, 352,800 pieces of information are recorded (44,100 * 2 channels * 4 seconds). Using 16-bit samples, it takes over 700,000 bytes to store a 4-second sound. This is 44,100 times more data than is stored by MIDI \citep*{Roads1996}. 
-
-%% Piano %%
-\subsection{Piano}
-Piano is one of the most popular musical instruments. There are two types of pianos: a grand piano (Figure~\ref{fig:grand_piano}) and an upright piano (Figure~\ref{fig:upright_piano}). A piano has usually 88 keys (52 white and 36 black). The lowest note is A0 with a fundamental frequency of 27.5Hz and the highest one is C8 with a fundamental frequency at 4186.0 Hz. 
-
-When you strike a piano key a padded hammer hits steel strings. The hammer rebounds and the strings continue to vibrate at their resonant frequency. When you release the key, a damper stops the string's vibration. 
-
-\begin{figure}[h!]
-\centering
-\subfigure[A grand piano]{ \includegraphics[scale=0.2]{grand_piano}\label{fig:grand_piano}}
-\subfigure[An upright piano]{\includegraphics[scale=0.2]{upright_piano}\label{fig:upright_piano}}
-\caption{Types of pianos.}
-\label{fig:pianos}
-\end{figure}
-
-How the sound is made.
-
-Inharmonicity.
-
-Tuning.
-
-Pedals.
-
-\section{Outline}
-
-\section{Details}
-
-\section{Experiments}
-
-\section{Evaluation}
+\subsection{Practical evaluation}
 
 \section{Conclusion}
 
