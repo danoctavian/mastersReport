@@ -561,6 +561,14 @@ echoHandleConn conn
 
 \subsection{Tor integration}
 
+The system runs as an externally managed Tor pluggable transport and doesn't make use of any of the existing Tor modules/frameworks for plugabble transports.
+
+Many of the other Tor pluggable transports (StegoTorus, ScrambleSuit, Dust) make use of the Tor obfsproxy  framework for developing pluggable transports. For developing this particular pluggable transport the obfsproxy framework isn't flexible enough. The reason is that obfsproxy handles the connection to the Tor server and client itself allowing you to "plug in" the transport logic in the middle, while in the case of our system there is no direct connection between the Tor client and bridge. The only connection over the network is the Bittorrent connection.
+
+As stated previously, the choice of programming language prevented any code reuse since obfsproxy and most Tor plugabble transports are developed in Python, C++ or more recently Go(meek). However, by developing the current solution we set foundation for the development of Tor pluggable transports in Haskell: the custom socks server module and the ExtendedORPort connection are the ncessary glue to handle Tor client and Tor bridge connections, respectively.
+
+ 
+
 \section{Evaluation}
 
 The evaluation of this project is tricky. Ideally we would like to answer the question of whether this covert channel does good a good job at avoiding filtering by censorship firewalls. Testing in a real life situation is irrelevant, because at the time of writing, no detection method is yet deployed by adversaries, since it is a completely new covert channel and adversaries will make no effort to block it until it is deployed at scale by the Tor network.
