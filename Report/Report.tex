@@ -416,6 +416,8 @@ When choosing the programming language for the project the main criteria were:
 
 Haskell is a high-level purely functional language that is advertised as being good for the rapid development of correct, robust software. It's type system is both flexible and powerful allowing you to write code that is concise and reusable while at the same time subjected to a great deal of compile time checks.
 
+Atlhough not a requirement, the fact that the language allows you to write pure computations (no side-effects, equivalent of mathematical functions) combined with the strong compile time checks makes it much  easier to write correct code. Whenever it is the case below, I will emphasize when a particular code component has been implemented in a pure fashion to facilitate testability and achieving correctness.
+
 The fact that the Haskell toolchain allows for writing of performant network applications has been proved empirically by the creation network applications such as the Warp HTTP web server whose performance exceeds that of other modern systems (node, tornado, php) \citep*{web:warpCrossBenchmark}.
 
 As for the availability of libraries, the choice of programming language was not the correct one in terms of prototyping and quick results. I believe Python would have been the obvious correct choice. If I were to choose Python the following libraries/modules would have been available:
@@ -434,7 +436,7 @@ The parsing, encoding and protocol modules above needed equivalent implementatio
 
 Not only this but Python, being high-level, dinamically typed, and generally well designed, is a very good choice for prototyping and writing programs whose final shape is not known and where signficant design changes happen while implementing. It can be argued that this was the case for this system.
 
-Two other aspects which greatly affected productivity but were not amongst the main considerations when choosing the programming language were \textit{familiarity} and \textit{learning curve}. I was moderately familiar with Python and it has a short learning curve, while I was a beginner Haskell programmer and the language has a significantly longer learning curve. Thus, a lot of the time spent on the project was invested in learning Haskell.
+Two other aspects which greatly affected productivity but were not amongst the main considerations when choosing the programming language are \textit{familiarity} and \textit{learning curve}. I was moderately familiar with Python and it has a short learning curve, while I was a beginner Haskell programmer and the language has a significantly longer learning curve. Thus, a lot of the time spent on the project was invested in learning Haskell.
 
 Having said that Python would have been the correct choice for prototyping, I would argue that Haskell is the long term correct choice, since it meets the other stated criteria and the minor lack of libraries is something that can be compensated by just investing development effort.
 
@@ -501,7 +503,7 @@ streamIncoming msgChan payloadChan decrypt =
 
 Notice how this style of coding isolates the reading and writing of data IO actions (in this case reading/writing channels) from the logic of the transformations on the stream which are pure computations that can be tested separately.
 
-I also used the Data.Conduit library for a more unconventional purpose: writing network protocols. A network protocol was modelled as a conduit that takes as an input a stream of bytes and produces a stream a bytes or a final result. The following snippet illustrates the data types and the function used to run the protocol:
+I also used the Data.Conduit library for a more unconventional purpose: writing network protocols. A network protocol was modelled as a conduit that takes as an input a stream of bytes and produces a stream a bytes or a final result. The next snippet illustrates the data types and the function used to run the protocol:
 
 \begin{lstlisting}
 type ProtocolConduit a = (MonadNetworkProtocol m) =>
@@ -514,10 +516,12 @@ runProtocol protocol sock = (sourceSocket sock) =$ protocol $$ (sinkSocketWithRe
 
 Thus, to implement the the ExtendedOR Port initialization protocol, one needs to implement a Conduit computation with the ProtocolConduit signature.
 
+This achieves the following: the protocol logic is implemented as a \textit{pure computation}  in the form of a stream transformation decoupled from the IO actions of reading and writing to network sockets.
+
 \myparagraph{Data.Attoparsec}
 Attoparsec was the parser library of choice used for parsing the message streams of all the implemented protocols because the library was build with this particular task in mind.
 
-The library allows for expressing parsing functions in a concise manner as shown in the following snippet for parsing the socks5 handshake message:
+The library allows for expressing parsing functions in a concise, pure manner as shown in the following snippet for parsing the socks5 handshake message:
 
 \begin{lstlisting}
 parseHandshake :: Parser Handshake
@@ -558,6 +562,21 @@ Server.run echoHandleConn receiverPublicPort
 echoHandleConn conn
   = forever $ (connectionGetChunk  conn) >>= (connectionPut conn)
 \end{lstlisting}
+
+The rest of the modules are auxilliary modules but many are standalone pieces of code that can be integrated as individual packages in Hackage.
+
+\begin{itemize}
+\item NetworkProtocol - module defining an interface for writing and running network protocols as Conduits
+\item Proxy - customizable proxy with a hook in connection initialization and Conduit hooks into the incoming/outgoing traffic; has logic for running socks proxies and reverse proxies
+\item Extended OrPort protocol  - Tor protocol for connecting a pluggable transport to the Tor bridge
+\item BitTorrent Message  - parser and serializer for the stream of BitTorrent messages. implemented using Attoparsec and the Data.Binary package
+\item BitTorrentClient - module defining a general interface for BitTorrent client communication
+\item deluged RPC API - library for communicating with the deluged daemon from Haskell
+\item uTorrent Web API - library for communicating with the uTorrent server from Haskell
+\item REncode - library for an encoding algorithm of loosely structured data. It is the Deluge project's more optimized version of the original BEncode encoding created for the BitTorrent project 
+\item Stream - contains data stream handling functionality common between the Server and the Client
+\item Utils - module containing miscellaneous useful functions
+\end{itemize}
 
 \subsection{Tor integration}
 
