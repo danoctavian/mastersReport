@@ -416,13 +416,13 @@ When choosing the programming language for the project the main criteria were:
 
 Haskell is a high-level purely functional language that is advertised as being good for the rapid development of correct, robust software. It's type system is both flexible and powerful allowing you to write code that is concise and reusable while at the same time subjected to a great deal of compile time checks.
 
-The fact that the Haskell toolchain allows for writing of performant network applications has been proved empirically by the creation network applications such as the Warp HTTP web server whose performance exceeds that of other modern networking applications (node, tornado, php) \citep*{web:warpCrossBenchmark}.
+The fact that the Haskell toolchain allows for writing of performant network applications has been proved empirically by the creation network applications such as the Warp HTTP web server whose performance exceeds that of other modern systems (node, tornado, php) \citep*{web:warpCrossBenchmark}.
 
 As for the availability of libraries, the choice of programming language was not the correct one in terms of prototyping and quick results. I believe Python would have been the obvious correct choice. If I were to choose Python the following libraries/modules would have been available:
 
 \begin{itemize}
 \item Twisted networking engine 
-\item socks proxy server
+\item socks/reverse proxy server
 \item Extended OrPort protocol  
 \item BitTorrent protocol parser
 \item REncode
@@ -430,22 +430,136 @@ As for the availability of libraries, the choice of programming language was not
 \item uTorrent RPC API
 \end{itemize}
 
-The parsing, encoding and protocol modules above needed equivalent implementations in Haskell. 
+The parsing, encoding and protocol modules above needed equivalent implementations in Haskell.  Haskell doesn't have a direct equivalent of Twisted, namely a framework for writing custom network applications. However, one can argue that by combining existing Haskell libraries you can get equivalent functionality with not much extra boilerplate code, as we shall see in the libraries section.
 
 Not only this but Python, being high-level, dinamically typed, and generally well designed, is a very good choice for prototyping and writing programs whose final shape is not known and where signficant design changes happen while implementing. It can be argued that this was the case for this system.
 
 Two other aspects which greatly affected productivity but were not amongst the main considerations when choosing the programming language were \textit{familiarity} and \textit{learning curve}. I was moderately familiar with Python and it has a short learning curve, while I was a beginner Haskell programmer and the language has a significantly longer learning curve. Thus, a lot of the time spent on the project was invested in learning Haskell.
 
-
+Having said that Python would have been the correct choice for prototyping, I would argue that Haskell is the long term correct choice, since it meets the other stated criteria and the minor lack of libraries is something that can be compensated by just investing development effort.
 
 \subsubsection{Libraries}
 
-On the flip side, the Haskell libraries that are available are reliable and efficient.
+On the flip side, the Haskell libraries that are available are reliable and efficient and superior to libraries in other languages solving similar problems.
 
-There are  
+Based on importance in the project, the following libraries are worth mentioning:
+
+\begin{itemize}
+\item  Control.Concurrent - offers explicit concurrency abstractions. 
+\item Control.Concurrent.STM - software transactional memory implementation
+\item Data.Conduit -  library for handling streams of data
+\item Data.Attoparsec - library for writing parsers in a concise, declarative way
+\end{itemize}
+
+\myparagraph{Control.Concurrent}
+
+I used this library for concurrent handling of requests and tasks.
+
+The main primitive of the library is forkIO which allows you to spawn a thread that is sent off to perform a computation. As of GHC 6.12, that thread is not an OS level thread, but a user-space green thread, which means many (read: millions) of such threads can be created without being concerned with expensive creation, per thread memory consumption, context switching and finalization. These threads run in what is called an event loop.
+
+The nice thing about the Haskell implementation of green threads is that for the user (programmer) the IO actions of green threads are still expressed naturally in the IO monad with no changes required. Other environments supporting green threads such as NodeJS, Dart or Python Twisted force you to write code in a continuation-passing-style with a callback or defferred object for each IO action. 
+
+The following code snippet illustrates the loop handling new connections in the proxy module. Each new connection is handled independently by the handleConn function.
+
+\begin{lstlisting}
+loop config serverSock
+  = forever $ accept serverSock >>= liftIO . forkIO . (handleConn config)
+\end{lstlisting}
+
+Nonetheless, the underyling GHC implementation for threads is using an even-driven model which makes efficient use of all machine cores, all being abstracted away from the user (the programmer). It can be said that Haskell makes the best of both worlds (the event driven concurrency and threaded concurrency model).
+\myparagraph{Control.Concurrent.STM}
+
+This library provides safe access of shared memory where all accesses are modelled as transactions (hence the name).
+
+My main use case for this library are message channels. In order for the threads to do useful work together, they communicate by sending messages to each other through channels. Although implemented in the STM library, channel communication should be understood as "no-shared-memory" way of communicating where a thread pushes a message inside a channel and another thread reads it from that channel.
+
+The next code snippet shows how the socks proxy thread notifies the PT client thread that it has finished initializing the proxying of a BitTorrent connection by sending a message through a control channel.
+\begin{lstlisting}
+-- proxy initialization function
+liftIO $ atomically $ writeTChan control Done
+-- ...
+-- the PT client thread 
+ completion <- liftIO $ timeout btConnInitTimeout
+		                   (liftIO . atomically . readTChan $ control)
+ when (completion == Nothing) $ throwError "bittorrent connection start timeout"
+\end{lstlisting}
+
+\myparagraph{Data.Conduit}
+
+The conduit library is used for modular and efficient handling of data streams. I used it for handling the data streams of the proxies and for processing the stream of incoming and outgoing transport protocol messages  in a pipeline-like fashion.
+
+The next snippet shows the how the stream of incoming BitTorrent Piece payloads is handled in order to be transformed in transport protocol messages:
+
+\begin{lstlisting}
+streamIncoming msgChan payloadChan decrypt =
+   (chanSource payloadChan)
+   $= map decrypt --attempt to decrypt all incoming payload
+   $= filter (/= Nothing) $= map fromJust -- filter the succesfully decrypted ones
+   $= conduitParser parseTransportMessage -- parse the messages
+   $$ chanSink msgChan -- send them down the message channel
+\end{lstlisting}
+
+Notice how this style of coding isolates the reading and writing of data IO actions (in this case reading/writing channels) from the logic of the transformations on the stream which are pure computations that can be tested separately.
+
+I also used the Data.Conduit library for a more unconventional purpose: writing network protocols. A network protocol was modelled as a conduit that takes as an input a stream of bytes and produces a stream a bytes or a final result. The following snippet illustrates the data types and the function used to run the protocol:
+
+\begin{lstlisting}
+type ProtocolConduit a = (MonadNetworkProtocol m) =>
+					 Conduit ByteString m (ProtocolOutput a)
+data ProtocolOutput a = ProtoData ByteString | FinalResult a
+runProtocol :: (MonadNetworkProtocol m, MonadIO m) =>
+			(ProtocolConduit a) -> Socket -> m (Maybe a)
+runProtocol protocol sock = (sourceSocket sock) =$ protocol $$ (sinkSocketWithResult sock)
+\end{lstlisting}
+
+Thus, to implement the the ExtendedOR Port initialization protocol, one needs to implement a Conduit computation with the ProtocolConduit signature.
+
+\myparagraph{Data.Attoparsec}
+Attoparsec was the parser library of choice used for parsing the message streams of all the implemented protocols because the library was build with this particular task in mind.
+
+The library allows for expressing parsing functions in a concise manner as shown in the following snippet for parsing the socks5 handshake message:
+
+\begin{lstlisting}
+parseHandshake :: Parser Handshake
+parseHandshake = do
+  versionByte <- anyChar
+  methodCount <- fmap ord anyChar
+  methods <- replicateM methodCount anyChar
+  return $ Handshake versionByte methods
+\end{lstlisting}
+
+\subsection{Code structure}
+
+The codebase was developed with a focus on building reusable modules. At this stage the code requires more refactoring work, documentation and optimization to meet Hackage standards, but as it stands it is clearly structured and abstract enough to be reusable.
+
+The user facing Haskell modules are the Client and Server modules. The next snippets give a feel about how to use these modules for communicating through a BitTorrent camouflaged channel (no Tor integration just yet):
+
+\begin{lstlisting}
+-- Client interface
+
+   transport <- Client.init socks5ProxyPort torrentClientConnection
+   let info = serverInfo clientEncyption serverTorrentFile serverSockAddr
+   conn <-  Client.makeConn transport info
+   connectionPut conn "why hello there"
+   response <- connectionGetChunk conn
+\end{lstlisting}
+
+\begin{lstlisting}
+-- Server interface
+
+{-
+receiverPublicPort - the publicly advertised BitTorrent port for incoming connections
+receiverPrivatePort - the port at which the BitTorrent reverse proxy listens and where all BT traffic is redirected on
+-}
+Server.run echoHandleConn receiverPublicPort
+					   receiverPrivatePort
+				           serverEncryption
+					   torrentClientConnection	
+echoHandleConn conn
+  = forever $ (connectionGetChunk  conn) >>= (connectionPut conn)
+\end{lstlisting}
 
 \subsection{Tor integration}
-\subsection{Modules}
 
 \section{Evaluation}
 
