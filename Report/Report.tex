@@ -100,8 +100,9 @@
 
 %%% END Article customizations
 
+\newcommand{\projectName}{BitSmuggler }
 
-\title{Report \\ Bittorrent camouflage for Tor traffic}
+\title{Report \\ \projectName- Bittorrent camouflage for Tor traffic}
 \author{Dan Cristian Octavian}
 %\date{} % Activate to display a given date or no date (if empty),
          % otherwise the current date is printed 
@@ -123,6 +124,10 @@
 
 \section{Introduction}
 
+\subsection{Problem}
+
+\todo[inline]{change the intorduction according to simon peyton jones's suggestions: a problem statement with an example + achievements}
+
  “If you have something that you don’t want anyone to know, maybe you shouldn’t be doing it in the first place”. Now, wouldn’t you hire the guy who said this to manage the surveillance system in your totalitarian state? I would, but you better prepare a fat paycheck because he’s the ex-CEO of Google. We are in a time when there’s a lot of talk about privacy and anonymity, because we are in a time where these things are becoming increasingly hard to attain. Most choose not to care, since all is good for the moment, and find the above quote comforting. A few find it alarming, though, because of its impactful indirect implications.
 
 There’s an old book written by a Chinese general, called Sun Tzu, full of reasonable advice about to conduct warfare and, unsurprisingly, a lot of his advice is about how having correct information about your opponent and depriving him of it is the key to victory. Wartime or not, having access to information and the ability to manipulate it and analyze it grants you great power. One would argue that a state’s secret services will use this power to protect its citizens. But once you build a tool that gives you such power, it’s also easy to abuse it or let it slip in the wrong hands.
@@ -136,14 +141,8 @@ This project’s aim is to build a solution to this problem that integrates with
 Using Bittorrent traffic as a cover is a promising choice since it is the most prevalent protocol when it come down to upstream traffic and overall the 3nd most prevalent after HTTP and video streaming (in terms of volume of data) ([1] Sandvine, 2013). it has the property that it has a large throughput both downstream and upstream and transports content fit for steganography (eg. video files). Its popularity makes it unlikely to be a target of blocking and doing so would be considered an extreme measure.
 
 The project seeks to also address the issue of Tor proxies using this cover channel being actively probed by scanners seeking to blacklist them through the use of a secret token presented as proof the the client contacting the proxy is to be trusted.
+\subsubsection{Contributions}
 
-
-\subsection{Motivation}
-
-\subsection{Objectives}
-
-
-\subsection{Contributions}
 
 
 
@@ -295,9 +294,125 @@ It is important to point out  that this is a continual arms-race and future solu
 
 \section{Security goals}
 
+The goal of this project is to create a network communication channel that cannot be subject to surveillance and censorship and integrates with the Tor network, allowing a user to access the Internet anonimously, unhindered and unseen by a surveillance firewall.
+
+\subsection{Security requirements in a concrete scenario}
+
+Suppose you are currently in Beijing and want to access your facebook profile to talk to your friends. A direct connection fails immediately. The domain is blocked. You think of alternative ways of hiding your access and you remember you have an openvpn account. When you navigate to openvpn.com you are blocked once again. One free, reliable option is also Tor. So you spin up your Tor browser and attempt once again to connect to facebook.com. The Tor client fails to connect to relays though: all connections are dropped.  \citep*{web:blockedInChina}
+
+You can be certain that by now that whichever mechanism is blocking your connections has already logged your attempts to use facebook, openvpn and Tor, your location and IP.  All the conventional ways of getting around traffic censorship have failed you, because this is not your standard ISP censoring porn sites by default. Your traffic is under surveillance by The Great Firewall of China and conventional ways of getting through it have been take care of. Also, just because your traffic goes through for some web addresses doesn't mean you aren't being watched. The arms race continues.
+
+In the above scenario you would want to be able to access any internet resource without being blocked, without the surveillance mechanism knowing that you are trying to get around it and, perhaps you would want to use all facilities of the Tor service.
+
+\subsection{Formal definition}
+
+In this section we formalize the security goals of the project shown informally with the above scenario.
+
+The project aims to preserve the following Tor security goals:
+
+\begin{itemize}
+\item Unlinkability -The adversary (censor) should not be aware of what 2 parties are involved in a network communication through Tor
+\item Performance -The performance of the communication channel should still be close enough to real-time so that the users are willing  to accept the tradeoff  in the favor of increased secuirty
+\end{itemize}
+
+Aside from this, the project sets its own security goals: 
+\begin{itemize}
+\item Undetectability - the adversary should not be able to determine whether a user is using \projectName
+\item Confidentiality - implied directly by undetectability; content of the communication is not known
+\item Unblockability - the adversary should not be able to block \projectName without blocking a large amount of unrelated traffic/causing a lot of collateral damage
+\item Plausible deniability - the user of \projectName should be able to deny its use. An advesary could only prove that the user did use \projectName ony if he inspects his machine. Otherwise any traffic generated by \projectName should pass as a normal BitTorrent file exchange.
+\item Resist active probing - if the Tor bridge running \projectName is contacted by the adversary in order to check if indeed it is running Tor (active probing), \projectName should avoid giving any sign of the existence of a Bridge. This is assuming the adversary does not have the bridge's contact details (address, public key) and is just shooting in the dark.
+\end{itemize}
+
 \section{Threat model}
 
+We now describe a model of the adversary that \projectName works against, by stating the \textit{tassumptions} made about its capabilities, limitations and intentions.
+
+This adversary model is very similar to the adversary model of the StegoTorus project  \citep*{stegotorus} and borrows many elements from it . This is because \projectName  is a lot like StegoTorus, who camouflages Tor traffic in common traffic types such as HTTP and uses steganography to hide the data payloads. Some points are inspired by the Telex paper \citep*{telex11} and SkypeMorph paper \citep*{skypeMorph} threat models as well.
+
+The adversary (censor) has the following attributes:
+
+\begin{itemize}
+\item is a state-level authority
+\item has an interest in connecting to the Internet and allowing the individuals subjected to censorship to connect to parts of the Internet for the socio-economical advantages it provides. It is thus interested in avoiding \textit{over-blocking}
+\item the state-level adversary has control over a section of the global network which we will call the \textit{national network} delimited by its national borders. We shall call this delimiting perimiter its \textit{network perimeter}.
+\item has full active and passive control over the national network. The censor can passively monitor all traffic entering and leaving its networks. It is possible for the censor to actively tamper with traffic by injecting, modifying or dropping it or just hjacking TCP sessions
+\item performs Internet traffic filtering at the network perimeter based on: address filters, content pattern filters, statistical filters; uses Deep-packet-inspection (DPI) to look at the contents of the packets (more on this below \ref{subsec:trafficFiltering})
+
+\item can be suspicious of encrypted network connections (ssh, vpn protocol, https, BitTorrent encryption, tls) and may choose to block them without a strong justification
+
+\end{itemize}
+
+The adversary's objectives are:
+\begin{itemize}
+\item block access to certain Internet resources
+\item monitor all Internet usage
+\begin{itemize}
+\item know which parties are communicating
+\item know the content/type of their communication
+\end{itemize}
+\end{itemize}
+
+The adversary's limitations are:
+
+\begin{itemize}
+\item DPI real-time analysis has strong time limitations for the computations that can be performed while on-the-side anlysis forces the censor to select a very small portion of the traffic for more complex analysis (discussed below  \ref{subsec:dpiLimitations}) 
+\item does not have access to the censored users' machines. Alhough the censor may issue mandates to inspect user devices or infect user devices with surveillance software, \projectName cannot service the user reliably if his/her machine is compromised
+\item has very limited abilities outside its network. It does not control any external network infrastructure or any popular external websites.
+\item is subjected to economical constraints - improving its surveillance infrastructure to counter new circumvention methods takes time and money
+\item has strong socio-economic reasons not to block BitTorrent traffic
+\item does not own enough malicious Tor relays to allow it to land attacks which compromise Tor's unlinkability
+\end{itemize}
+
+\subsection{More on traffic filtering}
+\label{subsec:trafficFiltering}
+
+\textbf{Address filters} are filters that look at IP address at other end of the connection and decide whether the connection is allowed or not by keeping track of an address blacklist. For example, all public Tor relays are blocked based on their IP address with address filters.
+
+\textbf{Pattern filters} rely on DPI capabilities to search for certain cleartext patterns in the network packet. One application of this was blocking of ssh connections based on a static pattern found in the plaintext ssh handshake. A counter measure was developed in the form of obfuscated-openssh \citep*{web:obfuscatedSSHRepo}.
+
+\textbf{Statistical filters} involve looking at patterns of packet interarrival times and size or statistical properties of the payload of the packets. For example, one can attempt to measure the entropy level of a payload normally containing English text to see if it matches an expected level or it shows a much higher level indicating it may be hiding a steganographied encrypted payload.
+
+\subsection{Adversary DPI limitations}
+\label{subsec:dpiLimitations}
+
+In order to apply the above filtering strategies, we assume the adversary is going to perform DPI on the traffic passing in and out of the network perimeter both in real-time and and on the side, by selecting a very small part of the traffic for a more detailed analysis.
+
+The StegoTorus paper \citep*{stegotorus} makes an interesting back-of-the-envelope calculation with regards to the available computation me for each packet inspected. By spending 2 microseconds analyzing each packet passing through the backbone router of Chicago, the throughput of the network is halved. Based on this reasoning, any real-time computation performed on inspected packets is bounded in time to something at the scale of 1 microsecond in order to not impact the performance of the whole national network significantly.
+
+To ballpark how much computation can be done in that time, a C program compiled with g++  -Ofast takes 1 microsecond to do the sum of squares of an array of bytes of size 650 on a 2.2 Ghz Intel ie processor. Thus whatever analysis is performed cannot be much more than a O(N) complexity algorithm on the whole packet (N the size in bytes of the packet).
+
+An example attack deemed feasible with a modern DPI box in real-time by the StegoTorus paper is one which involves looking at the size of packets of a connection, knowing that a vanilla Tor connection (no plugabble transports) consistently produces packets of a certain size. Through a simple stochastic analysis, they claim they can detect a Tor connection after observing a few dozen packages.
+
+We can deduce from the above that simple constant-time  or linear-time statistic analysis attacks are within scope of the assumed adversary.
+
+Support for the existence of on-the-side analysis has been found empirically through experiments which showed how The Golden Shield project blocks Tor bridges through active probing after having seen patterns of Tor traffic in the packets send to and from the bridge's address.
+
 \section{Design}
+We now present the design of  \projectName and discuss how it achieves its security goals in the face of the described adversary model.
+
+TODO: define intro stuff yadda yadda
+The goal of the project is to create a covert channel for Tor traffic that allows circumvention 
+
+
+\subsection{BitTorrent disguise}
+
+\subsubsection{Traffic embedding}
+
+\subsubsection{BitTorrent swarm handling}
+
+%describe the use of bittorrent traffic as covert channel
+
+\subsection{Cryptography}
+
+% bootstrapping requirements and assumptions (server public key)
+%describe the cryptographic key exchange
+
+\subsection{Steganography}
+
+% describe how the encrypted payload passes as an acceptable payload
+
+\subsection{Active probing resistance}
 
 \section{Implementation}
 
@@ -319,7 +434,7 @@ The system architecture follows a client-server model. The client and the server
 
 Figure~\ref{fig:system_architecture} shows the components of the server and the client for the \textit{concrete} use case of the system to create a communication channel between a Tor client and a Tor bridge. These components are the processes that the client and the server run and how connections are made between them.
 
-The client has the following components:
+The client has the following components:n
 
 \begin{itemize}
 \item Tor client process which generates the user traffic that needs to reach the the Tor bridge
@@ -414,7 +529,7 @@ When choosing the programming language for the project the main criteria were:
 \item the language toolchain (compiler/interpreter, profiler) allow you to produce efficient code in terms running time and space performance
 \end{itemize}
 
-Haskell is a high-level purely functional language that is advertised as being good for the rapid development of correct, robust software. It's type system is both flexible and powerful allowing you to write code that is concise and reusable while at the same time subjected to a great deal of compile time checks.
+Haskell is the programming language of choice for this project. Haskell is a high-level purely functional language that is advertised as being good for the rapid development of correct, robust software. It's type system is both flexible and powerful allowing you to write code that is concise and reusable while at the same time subjected to a great deal of compile time checks.
 
 Atlhough not a requirement, the fact that the language allows you to write pure computations (no side-effects, equivalent of mathematical functions) combined with the strong compile time checks makes it much  easier to write correct code. Whenever it is the case below, I will emphasize when a particular code component has been implemented in a pure fashion to facilitate testability and achieving correctness.
 
@@ -511,7 +626,8 @@ type ProtocolConduit a = (MonadNetworkProtocol m) =>
 data ProtocolOutput a = ProtoData ByteString | FinalResult a
 runProtocol :: (MonadNetworkProtocol m, MonadIO m) =>
 			(ProtocolConduit a) -> Socket -> m (Maybe a)
-runProtocol protocol sock = (sourceSocket sock) =$ protocol $$ (sinkSocketWithResult sock)
+runProtocol protocol sock
+  = (sourceSocket sock) =$ protocol $$ (sinkSocketWithResult sock)
 \end{lstlisting}
 
 Thus, to implement the the ExtendedOR Port initialization protocol, one needs to implement a Conduit computation with the ProtocolConduit signature.
@@ -607,6 +723,36 @@ Furthermore, expanding on the idea of playing the role of the adversary, I would
 \section{Further work}
 
 
+\section{Annexes}
+
+
+C code for ballparking how much computation can be performed in 1 microsecond.
+Compiled with g++ -Ofast.
+\begin{lstlisting}
+#include <stdio.h>
+#include <sys/time.h>
+
+
+long long current_timestamp() {
+    struct timeval te; 
+    gettimeofday(&te, NULL); // get current time
+    return te.tv_usec;
+}
+
+int compute(int x) {
+  return (x + 1) *(x + 1);
+}
+
+int main() {
+  int s = 0;
+  long long start = current_timestamp(); 
+  int n = 10000;
+  char a[n];
+  for (int i = 0; i < n; i++)
+    s += compute(a[i]);
+  printf("%llu hello %x", current_timestamp() - start, s);
+}
+\end{lstlisting}
 
 \bibliographystyle{plainnat}
 \newpage
