@@ -14,6 +14,8 @@
 % makes paragraphs have no identation and a space between them
 \usepackage{parskip} 
 
+% for caption-of functionality
+\usepackage{capt-of}
 
 % text coloring
 \usepackage{color}
@@ -146,9 +148,6 @@ Using Bittorrent traffic as a cover is a promising choice since it is the most p
 The project seeks to also address the issue of Tor proxies using this cover channel being actively probed by scanners seeking to blacklist them through the use of a secret token presented as proof the the client contacting the proxy is to be trusted.
 \subsubsection{Contributions}
 
-
-
-
 \subsection{Report Outline}
 \todo[inline]{Describe report outline}%
 
@@ -162,7 +161,7 @@ The project seeks to also address the issue of Tor proxies using this cover chan
 \todo[inline]{add a background section on steganography}
 \todo[inline]{any background entry on crypto?}
 
-This section covers the information needed to understand this project, assuming no prior w to knowledge about anonymity networks and censorship circumvention schemes but general knowledge about networks and encryption.
+This section covers the information needed to understand this project, assuming no prior knowledge about anonymity networks and censorship circumvention schemes but general knowledge about networks and encryption.
 
 I am going to discuss the following topics:
 
@@ -170,15 +169,16 @@ I am going to discuss the following topics:
 \item the Tor anonymity network - how it works, what is its purpose
 \item surveillance and censorship firewalls - case studies of censorship firewalls in China and Iran 
 \item Tor censorship circumvention schemes - what mechanisms does Tor currently provide for defeating the above mentioned firewalls
-\item the need for a better tor traffic camouflage
+\item the need for a better Tor traffic "cover channel"
+\item The BitTorrent protocol
 \end{itemize}
 
 %% Sound %%
 \subsection{The Tor anonymity network}
-Tor is a an anonymity network and a software that allows its users to defend against traffic analysis, a network surveillance technique meant to gather information about a user’s online activity. By using Tor, an individual achieves online anonymity. ([2] Tor project, 2014)
+Tor is a an anonymity network and a software that allows its users to defend against traffic analysis, a network surveillance technique meant to gather information about a user’s online activity. By using Tor, an individual achieves online anonymity. (\citep*{web:torOverview})
 
 \subsubsection{Purpose}
-Why would one need such a service? Suppose you are interested in accessing a website which is blocked by your ISP (ex. Pirate Bay). On the wild side, suppose you are government worker in an oppressive state and want to play the whistleblower role and contact outsiders to reveal secret information, action which could compromise your personal safety. Tor is an appropriate tool for this kind communication since it allows you to keep your communication anonymous: eavesdroppers will not be able to know who you are contacting over the network and your destination cannot know who you are either.
+Why would one need such a service? Suppose you are interested in accessing a website which is blocked by your ISP (eg. Pirate Bay). Alternatively, suppose you are a government worker in an oppressive state and want to play the whistleblower role and contact outsiders to reveal secret information, action which could compromise your personal safety. Tor is an appropriate tool for this kind communication since it allows you to keep your communication anonymous: eavesdroppers will not be able to know who you are contacting over the network and your the party you are communicating to is not aware of your real IP address, unless it is willingly disclosed.
 
 What does Tor effectively offer to users? Why does one need more security than that offered by encryption? It is because encryption hides the data payload of internet packets, while the headers of the packets are visible to any eavesdropper in the network. The packet headers reveal source, destination, size and timing. Tor allows a user to hide this information as well. The receivers of the packets themselves do not know the sender identity either.
 
@@ -186,49 +186,100 @@ Understanding adversary capabilities and intentions gives a more clear image of 
 
 \subsubsection{How it works}
 
-To understand how Tor works, it is useful to think of it as trying to hide from someone who is following you by using a convoluted path and covering your tracks. Thus, when communicating through Tor, your data follows a random path, moving from one Tor network node to another until it reaches its destination.
+To understand how Tor works, it is useful to think of it as trying to hide from someone who is chasing you by using a longer convoluted path and covering your tracks instead of just taking a direct route to your destination. Thus, when communicating through Tor, your data follows a random path, moving from one Tor network node to another until it reaches its destination.
 
-Data packets travel from source to destination through the Tor network on what is called a circuit. A circuit is composed of a chain of relays (machines which are part of the Tor network). Each relay in the circuit knows only about the relay before it and the one after it. Thus none of them know the entire path of the data they are transporting. A different set of encryption keys is negotiated by the client for each hop in the circuit so that no relay in the chain can track communications flowing through it. 
+Data packets travel from source to destination through the Tor network on what is called a circuit. A circuit is composed of a chain of relays (machines which are part of the Tor network). Each relay in the circuit knows only about the relay before it and the one after it in the chain. Thus none of them know the entire path of the data they are transporting from source to destination. A different set of encryption keys is negotiated by the client for each hop in the circuit so that no relay in the chain can track communications flowing through it. \citep*{web:torOverview}
 
-The above techniques ensure that an eavesdropper sitting between any 2 relays in a circuit cannot deduce any of the information normally given away by headers. Eavesdropping right at the source or right at the destination only reveals that some unknown packet is going into Tor or some unknown packet is exiting Tor, respectively.
+The figures \ref{fig:torNetwork}, \ref{fig:torCircuit} illustrate a Tor usage scenario. Suppose that Alice want to contact Bob by using the Tor network, instead of making a direct connection to Bob.
+
+Figure \ref{fig:torNetwork} shows how Alice learns about the Tor network from a public directory server (Dave). Note how the relays are not \textit{secret}. What machines are running Tor relays is public information.
+
+Figure \ref{fig:torCircuit} shows how Alice builds a circuit of Tor relays to relay its connection to Bob. Data packets travelling from Alice to Bob and back go through each node in the circuit in order. 
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.7]{htw1}
+\end{center}
+ \caption{A distributed anonymous network; taken from the Tor Project Overview \citep*{web:torOverview}}
+ \label{fig:torNetwork}
+ \end{figure}
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.7]{htw2}
+\end{center}
+ \caption{A Tor circuit; taken from the Tor Project Overview \citep*{web:torOverview}}
+ \label{fig:torCircuit}
+ \end{figure}
+
+The above techniques ensure that an eavesdropper sitting between any 2 relays in a circuit cannot deduce any of the information normally given away by headers. Eavesdropping right at the source  only reveals that a connection to some Tor relay is made (as shown in the figure \ref{fig:torCircuit} it is a green Tor encrypted link). Eavesdropping right at the destination reveals a red unecrypted link, meaning the traffic of the user is out in the open.
+
+\myparagraph{The exit (final) node}
+
+The final node in the circuit is called an exit node. The destination of the Tor user's connection sees the exit node as the source of the connection and is unaware of the real source since it has hopped through the entire chain to get to it. This way, user anonimity is achieved.
+
+It must be noted that the exit node, however, knows all about the user's connection: its destination, its protocol, its headers and its even its contents if they are not encrypted (eg. it is using http instead of using https). The only thing it doesn't know is the real source of the connection: who the user creating it actually is in terms of its IP address. 
+
+\myparagraph{Who runs Tor}
 
 The nodes which compose the Tor network are run entirely by volunteers and the diversity of these volunteers is another aspects which works to enforce the privacy guarantees of Tor. Since Tor nodes are spread across the globe and belong to a series of individuals/organizations and every communication through Tor follows a circuit composed of multiple relays, it is very difficult for one entity to be able to monitor the users of Tor.
 
 \subsubsection{Issues and potential attacks}
 
-However, one can argue that Tor security guarantees may be compromised by an adversary who owns a large amount of nodes in the Tor network or who monitors traffic going into and exiting the network to make statistical correlations. This is an acknowledged weakness of the system and it is a an accepted fact that Tor cannot face a state-level adversary with large resources and great reach. Despite this Tor has a large array of use cases. For example, using Tor to run a criminal organization and hide from the US government is an approach doomed to failure due to their computational and monitoring capabilities. An adversary such as the US has the resources to analyze the network and the influence necessary to monitor the Internet traffic in a variety of places, perhaps outside its national borders.
+\myparagraph{Traffic analysis}
+However, one can argue that Tor security guarantees may be compromised by an adversary who owns a large amount of nodes in the Tor network or who monitors traffic going into and exiting the network to make statistical correlations. This is an acknowledged weakness of the system and it is a an accepted fact that Tor cannot face a state-level adversary with large resources and great reach. Despite this Tor has a large array of use cases.
 
-Much research has gone in evaluating the effectiveness of traffic correlation attacks on the Tor network, which can be put to use as described above. The most recent paper on the subject is the most authoritative ([3] Aaron Johnson, 2013) and it reveals that this attack is more potent than previously believed. The authors develop a framework for analyzing the vulnerability of Tor against attackers owning IXP coalitions or/and being part of the actual network.
+For example, using Tor to run a criminal organization and hide from the US government is an approach likely to fail due to their computational and monitoring capabilities. An adversary such as the US has the resources to analyze the network and the influence necessary to monitor the Internet traffic in a variety of places, perhaps outside its national borders.
+
+On the other hand, using Tor to access discuss a business strategy with your busniess partners in order to ensure it is kept secret from your competition is a valid use case, since the adversary faced here is a less powerful one, a company.
+
+Much research has gone in evaluating the effectiveness of traffic correlation attacks on the Tor network, which can be put to use as described above. The most recent work by Johnson on the subject is the most authoritative (\citep*{captainJohnson}) and it reveals that traffic analysis is more potent than previously believed. The authors develop a framework for analyzing the vulnerability of Tor against attackers owning IXP coalitions or/and being part of the actual network and they show how adversaries with plausible amounts of control over this kind of infrastructure can very effectively detect which parties are communicating using the Tor network. Thus they compromise the anonimity and unlinkability (linking communication source to destination) of the Tor network.
+
+\myparagraph{Malicious exit nodes}
+
+As discussed earlier, exit nodes are the final nodes in Tor circuits being able to see the user traffic in plain. Of course, the traffic in the clear may have its content encrypted (https) but its headers are now visible.
+
+The issue with this is that the exit one provides its owner with the perfect setup for performing man-in-the-middle-attacks (MitM) as shown by Winter and Lindskog (\citep*{spoiledOnions}). Such possible attacks are DNS poisoning or SSL-based attacks (HTTPS MitM and sslstrip). Furthermore, owners of exit nodes can be annonymous if they choose so. Winter and Lindskog showed empirical evidence of such attacks being conducted.
 
 \subsubsection{Tor as a censorship circumvention tool}
 
 An interesting use case of Tor is that of using it a censorship and surveillance circumvention tool in countries where Internet access is subject to surveillance such as China and Iran. One could argue that this is a situation where the Tor network is facing a state level adversary and the effort is futile. However, these states tend to be isolated islands to the rest of the world which opposes their policies. This kind of adversary is limited to performing traffic analysis on all incoming and outgoing national traffic, having not much reach outside its borders. Therefore the problem of using Tor to bypass surveillance is reduced to that of finding a way of penetrating their firewall.
-A central element of Tor censorship circumvention tools is the Tor bridge. Currently all Tor relays are publicly available. Any censoring adversary who wants to prevent the use of Tor could trivially block access to these machines. That is why there exists a set of Tor nodes which are not publicly available and their addresses can only be obtained through other methods such as providing proof life or communicating with the owner of the bridge. 
+
+\subsubsection{Tor bridges}
+
+A central element of Tor censorship circumvention tools is the Tor bridge \citep*{web:torBridges}. A Tor bridge is a Tor relay with one essential difference: it is \textit{not publicly listed} in the Tor directory server (figure \ref{fig:torNetwork}). 
+
+This feature makes the Tor bridge harder to block by an adversary, unlike a normal relay. Any censoring adversary who wants to prevent the use of Tor could trivially block access to all Tor relays advertised by the Tor directory server based on their IP.
+
+That is why there exists a set of Tor nodes, the bridges, which are not publicly available and their \textbf{Bridge descriptors} (records containing all of the Bridge's contact details: address, public keys) can only be obtained through other methods such as providing proof life or communicating with the owner of the bridge. For example, one way of obtaining a Tor Bridge descriptor is by sending an email with a certain format to an email address owned by the Tor project from a Gmail email address. This relies on Google's ability to prevent users from automating email account creation.
 
 
 \subsection{Surveillance and Censorship firewalls}
 
-The problem at hand is that of developing a mechanism for allowing people to bypass internet surveillance and censorship systems, as part of  the Tor project. This means that such a mechanism aims to defeat a black-box adversary whose resources and techniques are unknown but can be intelligently estimated/guessed. In this section I will go over the necessary background knowledge about this adversary, focusing mostly on China, the owner of the most sophisticated Internet censorship system in the world ([4] OpenNet, 2013), and briefly discussing others such as Iran.
+The problem at hand is that of developing a mechanism for allowing people to bypass internet surveillance and censorship systems, as part of  the Tor project. This means that such a mechanism aims to defeat a black-box adversary whose resources and techniques are unknown but can be intelligently estimated/guessed. In this section we will go over the necessary background knowledge about this adversary, focusing mostly on China, the owner of the most sophisticated Internet censorship system in the world (\citep*{web:openNet}), and briefly discussing others such as Iran.
 
 \subsubsection{Observations}
 
-The adversaries aim to inspect information flowing in and out of the state they are operating in, tamper with it and block it as they see fit. They are interested in seeing which are the parties involved in the information exchange, and even though the actual content may be protected by encryption, data about source, destination, timing, size is easily accessible. Furthermore, they have passive and active systems which aim to defeat surveillance and censorship circumvention mechanisms, such as Tor. All of this is achieved by China with the Golden Shield Project (also known as the Great Firewall of China - GFW). ([5] HikingGFW, 2013)
+The adversaries aim to inspect information flowing in and out of the state they are operating in, tamper with it and block it as they see fit. They are interested in seeing which are the parties involved in the information exchange, and even though the actual content may be protected by encryption, data about source, destination, timing, size is easily accessible. Furthermore, they have passive and active systems which aim to defeat surveillance and censorship circumvention mechanisms, such as Tor. All of this is achieved by China with the Golden Shield Project (also known as the Great Firewall of China - GFW). (\citep*{web:hikingGFW})
 
-For the purpose of censorship, adversaries employ a series of methods ([6] Zittrain and Eldman, 2003):
+For the purpose of censorship, adversaries employ a series of methods (\citep*{internetFilteringChina}):
 
 \begin{itemize}
 \item filter based web server IP address - access to certain IP addresses is denied. All IP based protocols are affected. This is implemented most likely with block lists loaded onto border routers
 \item filtering based on DNS IP address - access to DNS servers with certain IPs is denied. May be easier to circumvent if the user has the IP of his target webserver and does not require a name resolution. Most likely uses the same implementation as above.
-\item DNS redirection - DNS servers in China resolve domain names to web server addresses other than the official ones ([10] Lowe, 2007)
+\item DNS redirection - DNS servers in China resolve domain names to web server addresses other than the official ones (\citep*{dnsWall})
 \item filtering based on keywords in the URL - requests are blocked whenever the URLs contain certain keywords. This is most likely implemented with packet-filtering systems integrated with the border routers.
 \item filtering based on keywords present in the HTML response - packets are blocked based on the content of the response. This is a strong argument for the presence a packet filtering system.
+\item explictly blocking tools for circumventing censorship: VPNs (\citep*{web:guardianChinaFirewall}) and Tor (\citep*{winterInChina}) 
 \end{itemize}
 
-It was shown that the GFW employs techniques that may be easy to circumvent but the circumvention will not go unnoticed - which highlights an important goal of this project: bypassing the firewalls should go unnoticed. The paper “Ignoring the great firewall a China” ([7] Clayton,  2006) features an experiment which proves that GFW attempts to kill an undesired connection by sending forged TCP reset packets both ways. The authors were speculating that it uses an offline packet analysis system to decide whether a connection is to be dropped or not. Both parties could theoretically choose to ignore the reset message and continue the exchange. However, the surveillance system could easily log this event and pursue an investigation on the communication endpoint located in China.
+\myparagraph{Countering censorship circumvention strategies}
 
-To circumvent the censorship methods, the most natural tactic is to use a VPN or proxy. However, this is no longer a viable alternative. VPN connections are often now blocked ([8] The Guardian, 2012) which proves GFW is detecting and then killing connections to VPNs or proxies ([5] HikingGFW, 2013). Circumvention tools based on proxies (Ultrasurf, Psiphon) now need to rotate IPs constantly since their servers are continuously blocked. It is very likely that the Golden Shield Project developed tools for detecting VPN, SSH, TLS/SSL traffic and also explicitly analyzes circumvention tools in order to fingerprint their traffic so that they can block them.
+It was shown that the GFW employs techniques that may be easy to circumvent but the circumvention will not go unnoticed - which highlights an important goal of this project: bypassing the firewalls should go unnoticed. Work by Clayton (\citep*{ignoringChina}) features an experiment which proves that GFW attempts to kill an undesired connection by sending forged TCP reset packets both ways. The authors were speculating that it uses an offline packet analysis system to decide whether a connection is to be dropped or not. Both parties could theoretically choose to ignore the reset message and continue the exchange. However, the surveillance system could easily log this event and pursue an investigation on the communication endpoint located in China.
 
-According to the paper “How the great Firewall of China is blocking Tor” ([9] Winter, 2012) the GFW is taking strong measures to prevent the use of Tor by its citizens. This is the most extensive study on the issue of Tor blocking in China. Apart from the most obvious measures such as blocking all public relay addresses and all web servers associated with the Tor project, GFW is blocking the Tor bridges as well. For example, the pool of bridges which are obtained by providing proof of life (captcha solving) on a Tor website is blocked entirely. 
+To circumvent the censorship methods, the most natural tactic is to use a VPN or proxy. However, this is no longer a viable alternative. VPN connections are often now blocked (\citep*{web:guardianChinaFirewall}) which proves GFW is detecting and then killing connections to VPNs or proxies (\citep*{hikingGFW}). Circumvention tools based on proxies (Ultrasurf, Psiphon) now need to rotate IPs constantly since their servers are continuously blocked. It is very likely that the Golden Shield Project developed tools for detecting VPN, SSH, TLS/SSL traffic and also explicitly analyzes circumvention tools in order to fingerprint their traffic so that they can block them.
+
+According to the work of Winter (\citep*{winterInChina}) the GFW is taking strong measures to prevent the use of Tor by its citizens. This is the most extensive study on the issue of Tor blocking in China. Apart from the most obvious measures such as blocking all public relay addresses and all web servers associated with the Tor project, GFW is blocking the Tor bridges as well. For example, the pool of bridges which are obtained by providing proof of life (captcha solving) on a Tor website is blocked entirely. 
 
 Moreover, their experiment, which involved pretending to be a tor client in China, showed GFW is actively probing machines on the web to see if they are Tor bridges. The authors conjectured that DPI (deep packet inspection) boxes are being used to discover packets that are potentially tor packets. Suspect network connections get their addresses placed in a queue. These addresses are later automatically scanned by connecting to them through the Tor protocol. If the machines respond as a Tor bridge would, they are blocked.
 
@@ -264,9 +315,9 @@ Since traditional VPN/proxy based solutions are quickly becoming obsolete due to
 \subsubsection{Private company solutions}
 Censorship circumvention solutions developed by companies deserve attention, even though they are often overlooked in the papers from the research community. The ones worth noting are Ultrasurf and Psiphon. Both companies developed systems which expand on the traditional model of using a proxy, but throw in techniques such as rapidly rotating IP addresses of their proxy servers to a ensure there is a set of unblocked proxy servers at all times and some connection obfuscation techniques.
 
-Both Ultrasurf and Psiphon ([11] Ultrareach, 2013) ([12] Psiphon, 2013) employ a fleet of proxy servers, and bootstraps the client software with a set of addresses of proxy servers, allowing for further discovery of other proxies as the old ones get blocked. Psiphon aims for a simplified client experience, offering also a no-installation solution through a web app for the sake of leaving no trace on the user’s machine. Ultrasurf states guarantees about the absence of traces as well. Psiphon’s  more interesting feature is its traffic obfuscation technology. It features multiple channels for transmitting data: VPN, HTTP, ssh and obfuscated ssh, switching from one to another in an attempt to find one that is not detected by the firewall based on the user’s use case.  It It argues its effectiveness based on its popularity claiming 260 million + pages have already been served using siphon. Ultrasurf boasts about supporting traffic worth of millions of pages daily.
+Both Ultrasurf and Psiphon (\citep*{ultrareach}) (\citep*{psiphon}) employ a fleet of proxy servers, and bootstraps the client software with a set of addresses of proxy servers, allowing for further discovery of other proxies as the old ones get blocked. Psiphon aims for a simplified client experience, offering also a no-installation solution through a web app for the sake of leaving no trace on the user’s machine. Ultrasurf states guarantees about the absence of traces as well. Psiphon’s  more interesting feature is its traffic obfuscation technology. It features multiple channels for transmitting data: VPN, HTTP, ssh and obfuscated ssh, switching from one to another in an attempt to find one that is not detected by the firewall based on the user’s use case.  It It argues its effectiveness based on its popularity claiming 260 million + pages have already been served using siphon. Ultrasurf boasts about supporting traffic worth of millions of pages daily.
 
-Both these services are closed source and lack transparency, while one of them has been shown to have serious issues. Ultrasurf has received the attention of security expert Jacob Appelbaum who wrote a paper (Technical analysis of the Ultrasurf proxying software) about his analysis of Ultrasurf through reverse engineering and discussions with the developers. According to his findings their software has numerous flaws, from non-up to date servers thus vulnerable to external attackers, lack of forward secrecy and overstated effectiveness (their proxy servers are often blocked in censoring countries) and their easy to filter bootstrapping process. Thier log retention policies are dubious at best, and they acknowledged to have submitted logs to the US government. 
+Both these services are closed source and lack transparency, while one of them has been shown to have serious issues. Ultrasurf has received the attention of security expert Jacob Appelbaum who present a study \citep*{ultrasurfSucks} about his analysis of Ultrasurf through reverse engineering and discussions with the developers. According to his findings their software has numerous flaws, from non-up to date servers thus vulnerable to external attackers, lack of forward secrecy and overstated effectiveness (their proxy servers are often blocked in censoring countries) and their easy to filter bootstrapping process. Thier log retention policies are dubious at best, and they acknowledged to have submitted logs to the US government. 
 
 My take on the case of these companies and their services is that their model has inherent flaws.  The closed source nature of these project means the entire responsibility of the software’s security is taken up by the company itself, since no research community can peer review it, this being an unwritten standard in the security world. Secondly, they act as single hop proxies and most likely keep logs, meaning that if an attacker gains control of a proxy he can see both source and destination of all traffic flowing through it. Moreover, none of them employ any solid method for avoiding their traffic being fingerprinted and easily blocked.
 
@@ -278,7 +329,7 @@ The general approach of the Tor project has been to favour the easy development 
 
 \myparagraph{Proxy blocking solutions}
 
-Even though the focus of this project is to find camouflage traffic for Tor, it is useful to look at Flashproxy ([14] Fifield, 2012) as it can combined with existing filtering circumvention techniques. The main idea behind it is to generate many ephemeral proxies for Tor traffic so that blocking them is a large effort which is almost pointless since they are short lived and quickly replaced by others. The neat trick used to achieve this is relying on random internet users to become proxies for a short time by running a Javascript script in their browser which proxies traffic from Tor clients to Tor relays. The script can reach a user’s machine by being embedded in a page served by a collaborating website. 
+Even though the focus of this project is to develop cover traffic for Tor, it is useful to look at Flashproxy ([14] Fifield, 2012) as it can combined with existing filtering circumvention techniques. The main idea behind it is to generate many ephemeral proxies for Tor traffic so that blocking them is a large effort which is almost pointless since they are short lived and quickly replaced by others. The neat trick used to achieve this is relying on random internet users to become proxies for a short time by running a Javascript script in their browser which proxies traffic from Tor clients to Tor relays. The script can reach a user’s machine by being embedded in a page served by a collaborating website. 
 
 \myparagraph{Traffic filtering circumvention}
 
@@ -300,17 +351,72 @@ As we have seen from the discussion in the previous sections, there is no robust
 
 It is important to point out  that this is a continual arms-race and future solutions are unlikely to be a silver bullet. Any solution that puts us in front of adversary or forces the adversary to invest large amounts of resources and time is a good one. For example, if a circumvention strategy requires the adversary to do massive infrastructure upgrades to counter it - consuming time and money, it is an important step forward.
 
+\subsection{The BitTorrent protocol}
+
+The BitTorrent protocol is peer-to-peer file sharing protocol presented by its creators as a free speech tool \citep*{web:btIntro}. It allows a user to publish and distribute files to other users.
+
+%popularity
+It is an extremely popular protocol and in 2012, 2 of its most popular clients BitTorrent Mainline and uTorrent had a userbase of more 150 million people  \citep*{web:btOrgUsers}. It is responsible for 30\% or more of the Internet traffic volume in the US, Europe and Asia accordinng to the records published by Sandvine \citep*{sandvineInternet}.
+
+%protocol information
+\myparagraph{The swarm}
+The protocol \citep*{btProtocol} is a scalable solution to the problem of data distribution. Given that a set of users requires a set of files, instead of using a client-server model to provide clients with the file, the file is shared from client to client in a cooperative manner.
+
+A group of clients sharing a particular file or group of files is called a \textbf{swarm}. 
+
+The members of a swarm can be either:
+\begin{itemize}
+\item \textbf{peers} - clients that don't yet have a complete copy of the file
+\item \textbf{seeds} - peers who have complete copy of the file; they remain in the swarm as file uploaders only
+\end{itemize}
+
+\myparagraph{The metainfo file}
+The file being dowloaded has a corresponding descriptor file, called a \textbf{metainfo file} usually marked with the extension .torrent. This descriptor is \textit{necessary} so that the BitTorrent client can perform the download. The torrent descriptor contains metadata: it specifies how the file is split in \textbf{pieces} and provides a SHA1 hash of each piece so that data integrity of the downloaded file can be checked. It also contains a global torrent hash which uniquely identifies the whole file based on its content.
+
+The entire file is split into pieces of varying sizes to make distributed sharing easier.
+
+Traditionally, the protocol operates with another party involved: the \textbf{tracker}. The tracker is an actual server that keeps track of each torrent descriptor and the swarm associated with it. When a client seeks to download a certain file it queries the tracker mentioned in the torrent descriptor.
+
+Lately, the protocol has shifted away from the tracker model towards a completely distributed design. All the user needs is the hash of the file that it wants to download, called a \textbf{magnet-link}. Based on a system called \textbf{DHT} (Distributed Hash Table) and querying with the magnet-link as the key, it is able with find out with the help of other BitTorrent clients which is the swarm working on the desired file and obtain the metainfo file. The only place where a server might be involved but \textit{not necessary} is in the distribution of magnet-links (piratebay) and in the initial bootstraping of the BitTorrent client with other BitTorrent client addresses so that DHT can work.
+
+\myparagraph{Peer communication}
+The peers communicate using a \textit{single} connection that is symmetrical. Messages that flow in both directions look the same. The messages are either control messages (eg. chocking/unchoking the connection - meaning more/no more data should be sent, piece requests) or data messages called \textbf{piece messages} containing \textbf{blocks} of the file being transfered. Blocks ar a subdivision of a piece that are defined by the piece's index, the offset in the piece and their length.
+
+\myparagraph{Torrent clients}
+
+Torrent clients are pieces of sofware used to download files. They all implement the core protocol while some implement extensions improvements to the protocol.
+For the purpose of this project it is important to note the relevant properties of the most popular BitTorrent clients in use(\citep*{btUsage}) in table \ref{btClients}.
+
+\begin{table}
+    \begin{tabular}{|l|l|l|l|l|l|}
+    \hline
+    Client              & Usage share & Open source & Platforms                                   & Proxy server & DHT \\ \hline
+    uTorrent            & 47.97\%     & No          & Windows, Mac, Linux  & yes          & yes \\ \hline
+    Vuze                & 22.49\%     & yes         & Windows, Mac. Linux                         & yes          & yes \\ \hline
+    BitTorrent mainline & 13.01\%     & no          & Windows, Mac. Linux                         & yes          & yes \\ \hline
+    Transmission        & 7.0\%       & yes         & Mac. Linux                                  & no           & yes \\ \hline
+    Libtorrent          & 1.02\%      & yes         & Windows, Mac. Linux                         & yes          & yes \\ \hline
+    \end{tabular}
+    \caption {Most popular BitTorrent clients}
+    \label {btClients}
+\end{table}
+
+Since BitTorrent clients will be a part of the system being build we present the relevant characterstics along with their usage share.
+
+The usage share data was compiled based on a study by Delft University. Note, however, that is not particularly accurate whne it comes down to global usage share since research focused on popular swarms listed on English language BitTorrent sites. An older study from 2009 made by EZTV’s NovaKing (\citep*{web:oldbtUsage}) reveals a more global view, yet more outdated: back then the top BitTorrent client was the Chinese BitTorrent client \textbf{Xunlei} with market share of 29.3\%.
+
 \section{Security goals}
 
 The goal of this project is to create a network communication channel that cannot be subject to surveillance and censorship and integrates with the Tor network, allowing a user to access the Internet anonimously, unhindered and unseen by a surveillance firewall.
 
 \subsection{Security requirements in a concrete scenario}
 
+The concrete scenario below showcases an individual who would want to be able to access any internet resource without being blocked, without the surveillance mechanism knowing that he/she is trying to get around it and, perhaps he/she would want to use all facilities of the Tor service.
+
 Suppose you are currently in Beijing and want to access your facebook profile to talk to your friends. A direct connection fails immediately. The domain is blocked. You think of alternative ways of hiding your access and you remember you have an openvpn account. When you navigate to openvpn.com you are blocked once again. One free, reliable option is also Tor. So you spin up your Tor browser and attempt once again to connect to facebook.com. The Tor client fails to connect to relays though: all connections are dropped.  \citep*{web:blockedInChina}
 
-You can be certain that by now that whichever mechanism is blocking your connections has already logged your attempts to use facebook, openvpn and Tor, your location and IP.  All the conventional ways of getting around traffic censorship have failed you, because this is not your standard ISP censoring porn sites by default. Your traffic is under surveillance by The Great Firewall of China and conventional ways of getting through it have been take care of. Also, just because your traffic goes through for some web addresses doesn't mean you aren't being watched. The arms race continues.
+You can be certain that by now that whichever mechanism is blocking your connections has already logged your attempts to use facebook, openvpn and Tor, your location and IP.  All the conventional ways of getting around traffic censorship have failed you, because this is not your standard ISP censoring piratebay.com by default. Your traffic is under surveillance by The Great Firewall of China and conventional ways of getting through it have been take care of. Also, just because your traffic goes through for some web addresses doesn't mean you aren't being watched. The arms race continues.
 
-In the above scenario you would want to be able to access any internet resource without being blocked, without the surveillance mechanism knowing that you are trying to get around it and, perhaps you would want to use all facilities of the Tor service.
 
 \subsection{Formal definition}
 
@@ -325,7 +431,7 @@ The project aims to preserve the following Tor security goals:
 
 Aside from this, the project sets its own security goals: 
 \begin{itemize}
-\item Undetectability - the adversary should not be able to determine whether a user is using \projectName
+\item Undetectability - the adversary should not be able to detect whether a user is using \projectName, its detection capabilities being limited by the computational constraints described in the threat model (\ref{sec:threatModel})
 \item Confidentiality - implied directly by undetectability; content of the communication is not known
 \item Unblockability - the adversary should not be able to block \projectName without blocking a large amount of unrelated traffic/causing a lot of collateral damage
 \item Plausible deniability - the user of \projectName should be able to deny its use. An advesary could only prove that the user did use \projectName ony if he inspects his machine. Otherwise any traffic generated by \projectName should pass as a normal BitTorrent file exchange.
@@ -333,10 +439,11 @@ Aside from this, the project sets its own security goals:
 \end{itemize}
 
 \section{Threat model}
+\label{sec:threatModel}
 
-We now describe a model of the adversary that \projectName works against, by stating the \textit{tassumptions} made about its capabilities, limitations and intentions.
+We now describe a model of the adversary that \projectName works against, by stating the \textit{assumptions} made about its capabilities, limitations and intentions.
 
-This adversary model is very similar to the adversary model of the StegoTorus project  \citep*{stegotorus} and borrows many elements from it . This is because \projectName  is a lot like StegoTorus, who camouflages Tor traffic in common traffic types such as HTTP and uses steganography to hide the data payloads. Some points are inspired by the Telex paper \citep*{telex11} and SkypeMorph paper \citep*{skypeMorph} threat models as well.
+This adversary model is very similar to the adversary model of the StegoTorus project  \citep*{stegotorus} and borrows many elements from it . This is because \projectName  is a lot like StegoTorus, who camouflages Tor traffic in common traffic types such as HTTP and uses steganography to hide the data payloads. Some points are inspired by the Telex project \citep*{telex11} and SkypeMorph project\citep*{skypeMorph} threat models as well.
 
 The adversary (censor) has the following attributes:
 
@@ -386,11 +493,11 @@ The adversary's limitations are:
 
 In order to apply the above filtering strategies, we assume the adversary is going to perform DPI on the traffic passing in and out of the network perimeter both in real-time and and on the side, by selecting a very small part of the traffic for a more detailed analysis.
 
-The StegoTorus paper \citep*{stegotorus} makes an interesting back-of-the-envelope calculation with regards to the available computation me for each packet inspected. By spending 2 microseconds analyzing each packet passing through the backbone router of Chicago, the throughput of the network is halved. Based on this reasoning, any real-time computation performed on inspected packets is bounded in time to something at the scale of 1 microsecond in order to not impact the performance of the whole national network significantly.
+The authors of StegoTorus  \citep*{stegotorus} make an interesting back-of-the-envelope calculation with regards to the available computation me for each packet inspected. By spending 2 microseconds analyzing each packet passing through the backbone router of Chicago, the throughput of the network is halved. Based on this reasoning, any real-time computation performed on inspected packets is bounded in time to something at the scale of 1 microsecond in order to not impact the performance of the whole national network significantly.
 
 To ballpark how much computation can be done in that time, a C program compiled with g++  -Ofast takes 1 microsecond to do the sum of squares of an array of bytes of size 650 on a 2.2 Ghz Intel ie processor. Thus whatever analysis is performed cannot be much more than a O(N) complexity algorithm on the whole packet (N the size in bytes of the packet).
 
-An example attack deemed feasible with a modern DPI box in real-time by the StegoTorus paper is one which involves looking at the size of packets of a connection, knowing that a vanilla Tor connection (no plugabble transports) consistently produces packets of a certain size. Through a simple stochastic analysis, they claim they can detect a Tor connection after observing a few dozen packages.
+An example attack deemed feasible with a modern DPI box in real-time by the StegoTorus paper is one which involves looking at the size of packets of a connection, knowing that a vanilla Tor connection (no plugabble transports) consistently produces packets of a certain size. Through a simple stochastic analysis, they claim they can detect a Tor connection after observing a few dozen packets.
 
 We can deduce from the above that simple constant-time  or linear-time statistic analysis attacks are within scope of the assumed adversary.
 
@@ -404,13 +511,13 @@ The central idea of the project is to camouflage the Tor traffic as BitTorrent t
 We discuss in this section how \projectName embeds the transported Tor traffic in BitTorrent traffic and how it creates an authentic BitTorrent traffic pattern  \ref{subsec:btDisguise}. We then have a look at how it makes sure that the embedded payloads cannot be spotted through the use of steganography  \ref{subsec:steganography} and what cryptographic protocol it uses to hide the data it is transporting  \ref{subsec:cryptoProtocol}. We also show how we resist active probing with a very simple design feature 
  \ref{subsec:activeProbingResist}.
 
+\subsection{The design in a nutshell}
 
-\subsection{Simple intuitive explanation of the design}
+Two parties, A nd B want to communicate with each other using a secure channel that has the security properties discussed above.  Their communication follows a client-server pattern, where A (client) always intiates communication with B (sever). Both A and B each run a BitTorrent client. The BitTorrent clients make a peer connection and start sending pieces of a file to each other.
 
-A simple explanation of the design of \projectName is based on an allegorical scenario. Suppose there are two friends Ursula and Barbara that are separated by a long distance. Suppose there is a river spring right next to Barbara and Barbara's river flows all the way next to Ursula. Suppose there is second river that springs from next to Ursula and goes all the way to Barbara, the 2 rivers flowing in parallel but in opposite directions. In order to talk to each other, the 2 friends put messages in bottles and throw them in the river that takes the bottles to their friend.
+In order to send messages to each other, A and B occasionally drop their messages in the bidirectional flow of BitTorrent traffic and the messages end up on the other side, carried in the content of the BitTorrent Piece messages. The BitTorrent flow runs unprerturbed by the insertion of messages. 
 
-
-Similarly, \projectName sets up a client and a server to talk to each other. The client A and the server B each run a BitTorrent client. the BitTorrent clients make a peer connection and start sending pieces of a file to each other: 2 data flows are created (2 rivers). In order to send messages to each other, they occasionally drop their messages in the flow of BitTorrent traffic and the messages end up on the other side, carried in the content of the BitTorrent Piece messages. Just like the river flow, the BitTorrent flow runs unprerturbed by the dropping of messages.
+To an adversary, the connection looks like a normal BitTorrent connection. Through a proper choice of cryptographic tools and use of steganography the content of the traffic generated by the connection looks genuine to an adversary observing it. In short, the displaced content of the BitTorrent pieces is compressed media data which looks very much like a random string and the content replacing it looks like random data as well.
 
 \subsection{BitTorrent disguise}
 \label{subsec:btDisguise}
@@ -460,7 +567,7 @@ Given the choice to use an existing type of traffic as camouflage, one needs to 
 
 \end{itemize}
 
-The BitTorrent protocol matches those properties.
+The BitTorrent protocol has those properties.
 
 It is a popular protocol, according to the Sandvine Internet phenomena report \citep*{web:sandvineInternet} which studied internet traffic in different regions of the world. In North America, it is the number 1 contributor to the volume of upstream traffic (34.81\%) and ranks as the 4\textsuperscript{th} contributor to downstream traffic (5.57\%) with an aggregate share of 9.23\% (ranking 4\textsuperscript{th}).
 
@@ -520,24 +627,26 @@ To create a bidirectional flow of data, another type of BitTorrent relationships
 \subsubsection{Trusting the Bittorrent client}
 \label{subsubsec:trustingBitTorrentClient}
 
-The BitTorrent client is a component of the system that may be closed-source and coming from a different source other than the Tor project. What happens if the client contains malware used to attack Tor users? A plausible scenario is that some \projectName instances use the closed-source BitTorrent client Xunlei for Chinese users, since that is the most popular torrent client in China. Xunlei has been found to contain malware in the past, therefore it is plausible that the state-level adversary may add a rogue patch to it meant as an attack against \projectName.
 
-Although it is stated in the security goals that \projectName is not meant to work when the user machine is compromised, the system itself \textit{requires} the client is present so it should take into consideration the possibility of adversarial code placed in the Torrent. In the case of a closed-source client, no claims can be made about what functionality it is actually running.
+The BitTorrent client is a component of the system that may be closed-source and coming from a different source other than the Tor project. What happens if the client contains malware used to attack Tor users? A plausible concrete scenario is that some \projectName instances use the closed-source BitTorrent client Xunlei for users located in China, since that is the most popular torrent client in China. Xunlei has been found to contain malware in the past, therefore it is plausible that the state-level adversary may add a rogue patch to it meant as an attack against \projectName.
 
-Solutions to this issue are:
+
+However, it is stated in the security goals that \projectName is not meant to work when the user machine is compromised, For the given adversary model, this issue is outside of the scope of the project. But since the system itself \textit{requires} the BitTorrent client  the possibility of adversarial code placed in the client was taken into consideration. In the case of a closed-source client, no claims can be made about what functionality it is actually running, while open source BitTorrent client binaries should only be trusted if coming from a trusted source.
+
+Solutions to this issue that can be explored in the future are:
 \begin{itemize}
 \item avoid using closed-source BitTorrent clients - the problem is that the most popular clients are closed source (uTorrent, Xunlei)
 \item sandbox the clients - make them unaware of their context by sandboxing them in a VM.
 \end{itemize}
 
-\todo[inline]{make a decision about this. or consider it as a non-issue}
 
 \subsection{Transport protocol}
 
 \todo[inline]{describe the transport protocol - this is the protocol of the plugabble transport embedded in the BitTorrent traffic; it talks about handshakes, acknowledgements, data messages, switch swarm messages etc.}
 
 \subsection{Cryptography}
-
+\label{subsec:crypto}
+\label{subsec:cryptoProtocol}
 The cryptographic protocol of \projectName is designed to guarantee confidentiality and at the same time preserve the undetectability of the communication.
 
 The protocol makes use of the following tools:
@@ -556,19 +665,19 @@ There are 2 parties communicating: a client (C) and a server (S).
 
 The server generates a 32-byte private key K\textsubscript{S} and derives a public key P\textsubscript{S} = curve25519(K\textsubscript{S}, 9). The server then publishes its key in its Tor bridge descriptor.
 
- It is assumed that the client knows the public key of the server P\textsubscript{S}, because it obtains out-of-band the Tor bridge descriptor containing this key.
+ It is \textit{assumed} that the client knows the public key of the server P\textsubscript{S}, because it obtains out-of-band the Tor bridge descriptor containing this key.
 
 The client generates a 32-byte private key called K\textsubscript{C} and derives a curve25519 public key P\textsubscript{C} and a uniform string representation of it U\textsubscript{C} with (P\textsubscript{C}, U\textsubscript{C}) = Elligator.generatePublicKey(K\textsubscript{C}).
 
 The client then generates the shared secret between the server and the client K\textsubscript{SC} with K\textsubscript{SC} = curve25519(K\textsubscript{C},  P\textsubscript{S}).
 
-The client initiaties the communication. By sending U\textsubscript{C} to the server in plain-text over an untrusted-channel. U\textsubscript{C} has the appearance of a uniform random string, and thus its presence cannot be detected by an adversary, preserving undetectability.
-
-\todo[inline]{what else does the client send here?  doesn't it need to sign this message somehow to show that it knows about the server's public key?}
+The client initiaties the communication. By sending U\textsubscript{C} to the server in plain-text over an untrusted-channel. U\textsubscript{C} has the appearance of a uniform random string, and thus its presence cannot be detected by an adversary, preserving undetectability. Along with U\textsubscript{C}, the client sends a handshake message to the server M\textsubscript{hanshake} enrypted with the derived shared secret K\textsubscript{SC} as such: \{M\textsubscript{hanshake}\}\textsubscript{K\textsubscript{SC}}.
 
 Once the server receives U\textsubscript{C}, it computes the curve25519 public key P\textsubscript{C} by using the function P\textsubscript{C} = Elligator.representativeToPublicKey(U\textsubscript{C}).
 
 Then the server derives the shared secret between the server and the client K\textsubscript{SC} using K\textsubscript{SC} = curve25519(K\textsubscript{S}, P\textsubscript{C}).
+
+It then decrypts the handshake message \{M\textsubscript{hanshake}\}\textsubscript{K\textsubscript{SC}} using the shared secret.
 
 At this point, both the client and the server know the shared secret K\textsubscript{SC}. From this point onward all messages sent between the sides are encrypted using symmetric key encryption based on the shared secret.
 
@@ -581,19 +690,17 @@ To perform symmetric key encryption of the messages sent between the server and 
 This mode of operation has the following desirable properties:
 \begin{itemize}
 \item provides data \textbf{confidentiality} - contents of the message are kept secret
-\item provides data \textbf{integrity} - decryption will fail if the data has been tampered with
+\item provides data \textbf{integrity} - the decryption function of AES in GCM mode has a return value which is either a plaintext message or a failure to decrypt. The function fails to decrypt whenever the input data hasn't been correctly encrypted (it either has been tampered with or it simply isn't an encrypted text)
 \end{itemize}
 
 The first property works to achieve our confidentiality security goal.
 
-The second property is useful in order to detecting any tampering done by the adversary and also to decide, as BitTorrent pieces arrive, which of them actually contain an encrypted payload. Decryption is attempted on the content of all BitTorrent piece messages arriving: if it fails it is considered to be an ordinary piece, if it succeeds then it had an encrypted payload.
+The second property is necessary to determine whether an encrypted payload is actually \textit{present}.  From the perspective of the receiver an incoming BitTorrent piece may or may not contain an encrypted payload. Decryption is attempted on the content of all BitTorrent piece messages arriving: if it fails it is considered to be an ordinary piece, if it succeeds then it had an encrypted payload.
 
-\label{subsec:cryptoProtocol}
 
-% bootstrapping requirements and assumptions (server public key)
-%describe the cryptographic key exchange
 
 \subsection{Steganography}
+\label{subsec:steg}
 
 \projectName puts the transported traffic in the Piece messages of a BitTorrent connection. Through the use of steganography, the transported traffic is concealed in the data file that the BitTorrent connection is exchanging so that the adversary is not aware of the presence of a secret message.
 
@@ -601,9 +708,11 @@ The steganographic problem at hand is different from the classical applications 
 
 The challenge here is to make it good enough so that any kind of real-time steganalysis performed by the adversary is not able to detect the presence of a concealed payload.
 
-We employ a \textit{simple technique}: place payloads encrypted with \textbf{symmetric key encryption} in the content of files whose data looks like random noise. When we say a piece of data looks like random noise, we mean it is a sequence of bytes that has a probability distribution close to that of random noise.
+We employ a \textit{simple technique}: place payloads encrypted with \textbf{symmetric key encryption} using \textbf{AES-GCM} as the block cipher and its mode of operation in the content of files whose data looks like random noise. When we say a piece of data looks like random noise, we mean it is a sequence of bytes that has a probability distribution close to that of random noise.
 
-The result of symmetric key encryption is a sequence of bytes whose probability distribution is that of random noise so it should blend in with the content of the file.
+The result of AES-GCM encryption is a sequence of bytes whose probability distribution is that of random noise and therefore it is indistinguishable from a random string if one \textbf{does not know the secret key}. However it is distinguishable from a random string if the secret key is known. Thus it should blend in with the content of the file.
+
+Here we make a \textbf{key security assumption}: the compressed media traffic is not (easily) distinguishable from a random bit string. 
 
 This simple steganographic technique relies on advantageous properties of BitTorrent protocol/traffic:
 \begin{itemize}
@@ -629,9 +738,12 @@ Video is the preffered type of file for embedding concealed data in \projectName
 
 Censors use a practice called active probing to check if  a remote sever is indeed a Tor bridge. They simply try to contact it pretending they are Tor clients, or, even simpler, they send junk bytes at it to see if responds with the Tor protocol. There is empirical proof of this strategy being used by The Golden Shield project (\citep*{web:bridgeKnock}).
 
-\projectName deals with this issue in the situation in which the adversary does not have the Tor bridge descriptor and is attempting a probe after seeing some suspicious traffic to the probed server. If an adversary attempts to make a BitTorrent connection and thus initiate a \projectName connection the \projectName server will only regard it as a valid connection and respond accordingly if the handshake message is signed  with the server's public key.  If it does not receive this message, it lets the BitTorrent connection flow untampered and classifies it as a non-\projectName connection. To the adversary, it seems that the remote BitTorrent client responds normally - performing a standard peer connection.
+\projectName makes it impossible for an adversary to perform active probing on the Tor bridge without knowing the Tor bridge's descriptor. If an adversary attempts to make a BitTorrent connection and thus initiate a \projectName connection, the \projectName server will only regard it as a valid connection and respond accordingly if the initial message contains proof of knowledge of the server's public key by being correctly encrypted as described in the cryptography section (\ref{subsec:crypto}).  If it does not receive this message, it lets the BitTorrent connection flow untampered and classifies it as a non-\projectName connection. To the adversary, it seems that the remote BitTorrent client responds normally - performing a standard peer connection. 
+
+If the bridge descriptor is known by the adversary, active probing is possible since the adversary is indistinguishable from an honest user, as far as BitSmuggler is concerned.
 
 This behaviour is implicit in the design: since it is using a normal BitTorrent client to generate the BitTorrent traffic it responds as a normal torrent client would when contacted by peers. It just check all incoming connections to see if they are \projectName connections and \textit{only then} does it start embedding encrypted responses in the BitTorrent pieces.
+
 
 \section{Implementation}
 
@@ -817,7 +929,7 @@ liftIO $ atomically $ writeTChan control Done
 -- the PT client thread 
  completion <- liftIO $ timeout btConnInitTimeout
 		                   (liftIO . atomically . readTChan $ control)
- when (completion == Nothing) $ throwError "bittorrent connection start timeout"
+ when (isNothing completion) $ throwError "bittorrent connection start timeout"
 \end{lstlisting}
 
 \myparagraph{Data.Conduit}
@@ -829,8 +941,8 @@ The next snippet shows the how the stream of incoming BitTorrent Piece payloads 
 \begin{lstlisting}
 streamIncoming msgChan payloadChan decrypt =
    (chanSource payloadChan)
-   $= map decrypt --attempt to decrypt all incoming payload
-   $= filter (/= Nothing) $= map fromJust -- filter the succesfully decrypted ones
+   $= Conduit.map decrypt --attempt to decrypt all incoming payload
+   $= filter (not . isNothing) $= Conduit.map fromJust -- filter the succesfully decrypted ones
    $= conduitParser parseTransportMessage -- parse the messages
    $$ chanSink msgChan -- send them down the message channel
 \end{lstlisting}
@@ -923,15 +1035,116 @@ Many of the other Tor pluggable transports (StegoTorus, ScrambleSuit, Dust) make
 
 As stated previously, the choice of programming language prevented any code reuse since obfsproxy and most Tor plugabble transports are developed in Python, C++ or more recently Go(meek). However, by developing the current solution we set foundation for the development of Tor pluggable transports in Haskell: the custom socks server module and the ExtendedORPort connection are the ncessary glue to handle Tor client and Tor bridge connections, respectively.
 
- 
-
 \section{Evaluation}
 
-\todo[inline]{write the evaluation}
+The evaluation of \projectName consists of assessing whether the security goals of the project along with a performance measurement of the system.
+
+It must be noted that, since \projectName develops a completely new technique in terms of "cover traffic", no attack exists against it at the time of evaluation. Thus, there is no relevant benchmark of its efficiency in terms of security. Therefore, the evaluation of the secrity goals of the project is \textit{theoretical}.
 
 \subsection{Theoretical evaluation}
 
-\subsection{Practical evaluation}
+\subsubsection{Steganography evaluation}
+
+Steganography in \projectName works to achieve the goals of \textbf{undetectability} and \textbf{plausible deniability}.
+
+A key property of the design of \projectName is that it creates no \textit{fingerprintable string patterns} in the traffic that it generates. This is ensured by the following design decisions:
+\begin{itemize}
+\item preserving the BitTorrent stream structure - only the Piece payloads of the BitTorrent stream are altered and they are the only messages of the protocol which contain custom data
+\item use of the Elligator encoding - using it to send the client public key ensures that no message contains a plain-text key whose mathematical properties can be verified - the key looks like a random string
+\item use of AES-GCM - the block-cipher mode choice for the symmetric-key encryption perfomed by the protocol ensures that the encrypted payloads looks like random data
+\end{itemize}
+
+The steganographic design of \projectName relies on a important assumption stated in section \ref{subsec:steg}, namely the fact that the inserted encrypted payloads are indistinguishable from the media file data they replace.
+
+In order to evaluate this claim, we make a statistical argument about the properties of encrypted payloads and video files and how they are indistinguishable based on their entropy, using \textbf{Shannon entropy} as a measure. The Shannon entropy is a measure of information content and since both types of data have very little redundancy, they both exhibit an almost maximal entropy value.
+
+Shannon entropy is measured for byte sequences of length 1. Based on the computational power assumptions made in the threat model, it is very unlikely that a Shannon entropy on longer sequences can be measured  given the hard bound to computation time.
+
+We measured the Shannon entropy for a set of video files and for a set of sequences of encrypted data. The results are shown below.
+
+\begin{table}
+    \begin{tabular}{|l|l|l|}
+    \hline
+    Data           & Mean     & Standard deviation \\ \hline
+    Video files    & 7.991141 & 0.01074686         \\ \hline
+    Encrypted data & 7.999814 & 1.888357e-05       \\ \hline
+    \end{tabular}
+    \caption{Comparison of entropy values}
+\end{table}
+
+Although both results are close to a maximal value (with a 256 symbol set, maximum entropy value is log\textsubscript{2} 256 = 8) and both have a small standard deviation, a difference can be spotted.
+
+We used a \textbf{Kolmogorov–Smirnov statistical test} which compares the 2 samples and evaluates the hypothesis that they both originate from the same distribution. Based on the 2 sets of samples , the test shows that the hypothesis is unlikely. It yields a p-value of  p-value = 5.64e-05. Based on the p-value we decide on whether to reject the hypothesis. Standardly, the hypothesis is rejected for values less than 0.5 so based on the results of the test we \textit{reject} the hypothesis.
+
+The above tests shows that 2 types of data can be differentiated by an adversary if he is able to recompose the whole file content.
+
+Recomposing the whole file content involves:
+\begin{itemize}
+\item eavesdropping on the BitTorrent connection
+\item reconstructing TCP packets
+\item extractring the Piece message payloads from the BitTorrent communication stream
+\end{itemize}
+
+We stated in the adversary model that all these actions are not computationally feasible so therefore an adversary will not be able to perform statistical test such as the one described above.
+
+In a realistic scenario, the adversary performs a statistical test on incoming TCP fragments. This means that the pure file data is mixed with protocol data. It is true that the bulk of the data flowing through consists of the file data, so the above test may still be effective even under these conditions, but no verification of this possibility has been made yet.
+
+It must be noted that the current implementation did not use strong steganographic techniques: the transported encrypted data was not embedded in a real video file, it just displaced the video file data in the BitTorrent piece in which it is implemented. Adding this feature is a reasonable undertaking and its single side-effect will be an increase in steganographic expansion (trading performance for security).
+
+\myparagraph{Interpretation}
+Based on this evaluation, we conclude that the design which leaves no fingerprintable patterns is sound and the only practical way of cracking the steganographic technique is through statistical analysis.
+
+Furthermore, the approach of displacing video data and replace it with transported data shows great promise in the sense that the video data's entropy is very close to that of a random sequence while the adversary's computational capabilities of detecting the difference are limited.
+
+However, we believe, based on the statistical analysis of encrypted data versus video data, that there is a possibility that a fast implementation of some entropy measure, even if it operates on TCP framgents, may prove effective in violating the undetectability goal. As stated, the current steganography approach is a crude one, a stronger steganographical approach should be investigated which is very likely to alleviate this shortcoming.
+
+As far as plausible deniability is concerned, since no fingeprintable trace is present and all data is encrypted and looks like a random string there is no proof that the BitTorrent connection was not authentic and that encrypted data is present.
+
+\subsubsection{Piece hash attack}
+
+Since the payload of the piece messages of has been tampered with, as a tampered piece travels between the \projectName client and server it may be checked for consistency by an adversary.
+
+We deem such as an attack \textit{computationally infeasible} based on our adversary model: extracting piece payloads involves the same actions of reconstructing the BitTorrent messages as those mentioned in the steganography evaluation section. Furthermore, to get the hash of the piece, the adversary also requires a copy of the torrent descriptor file which is even more computational work.
+
+As an alternative to eavesdropping, an adversary may join BitTorrent swarms to check if any of the swarm peers is consistently sending tampered pieces and therefore suspect its authenticity. This is impossible thanks to the implementation decision off ensuring that before any communication is started, the 2 BitTorrent clients already have a correct copy of the file which will be used as "carry traffic". The BitTorrent client software itself only operates with pieces which pass integrity checks, since each time a tampered piece arrives, the \projectName proxy reads it contents and corrects the piece contents by reinserting the valid piece payload. 
+
+\subsection{Performance evaluation}
+
+The performance evaluation is meant to show how efficient \projectName is in transporting data in terms of time and resources (camouflage traffic). \projectName was evaluated stand-alone, without the Tor integration, running a minimal custom protocol for sending files.
+
+\subsubsection{Testing setup}
+
+The setup for all performed experiments consisted of:
+\begin{itemize}
+\item a client that was running on a laptop PC with a wireless connection (6.20 Mbps download. 085 Mbps upload).
+\item a server running on a virtual host in Amsterdam.
+\end{itemize}
+
+The round trip time between the 2 machines is shown in table \ref{table:rtt}:
+
+%\captionof{table}{ 
+\begin{table}[!htbp]
+    \begin{tabular}{|l|l|}
+    \hline
+    Mean               & 64.698 ms  \\
+    Standard deviation & 38.830 ms  \\
+    Minimum            & 42.950 ms  \\
+    Maximum            & 234.476 ms \\ \hline
+    \end{tabular}
+    \caption {Round Trip Time}
+   \label{table:rtt}
+\end{table}
+
+\subsubsection{Steganographic expansion}
+
+\subsubsection{Goodput}
+
+In order to see how fast data can travel through the \projectName pipe, we measure the goodput (application level throughput) of the system and compare it to the performance of an HTTP connection to an nginx server.
+
+The experiments consist of downloads from server to client of files of varying sizes.
+
+\subsubsection{Resilience}
+\todo[inline]{should i still do this. it is a bit more complicated}
 
 \section{Conclusion}
 
@@ -965,7 +1178,7 @@ int main() {
   char a[n];
   for (int i = 0; i < n; i++)
     s += compute(a[i]);
-  printf("%llu hello %x", current_timestamp() - start, s);
+  printf("squaring an array of \%d bytes takes \%llu microseconds", n, current_timestamp() - start);
 }
 \end{lstlisting}
 
