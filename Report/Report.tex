@@ -4,7 +4,7 @@
 % This is a simple template for a LaTeX document using the "article" class.
 % See "book", "report", "letter" for other types of document.
 
-\documentclass[11pt]{article} % use larger type; default would be 10pt
+\documentclass[11pt]{book} % use larger type; default would be 10pt
 \usepackage{natbib}
 \usepackage{mathtools}
 \usepackage{graphicx}
@@ -115,6 +115,9 @@
 \newcommand{\myparagraph}[1]{\paragraph{#1}\mbox{}\\}
 \maketitle
 
+\newpage
+
+
 \listoftodos
 
 \tableofcontents
@@ -125,7 +128,7 @@
 %%%%%%%%%%%%%%%%%%%
 %%%%% INTRODUCTION %%%%%
 
-\section{Introduction}
+\chapter{Introduction}
 
 \todo[inline]{write an introduction following the structure suggested by symon peyton jones: fit in 1 page, introduce the problem with an example and explain the contrbutions of this work to solving that problem}
 
@@ -161,7 +164,9 @@ The project seeks to also address the issue of Tor proxies using this cover chan
 \todo[inline]{add a background section on steganography}
 \todo[inline]{any background entry on crypto?}
 
-This section covers the information needed to understand this project, assuming no prior knowledge about anonymity networks and censorship circumvention schemes but general knowledge about networks and encryption.
+This section covers the information needed to understand this project, assuming no prior knowledge about anonymity networks, censorship circumvention schemes, P2P protocols.
+
+The report assumes general knowledge about networks and cryptography (public key cryptography, symmetric key cryptography, Diffie-Hellman key exchange).
 
 I am going to discuss the following topics:
 
@@ -337,6 +342,14 @@ Most traffic filtering avoidance projects rely on the idea of camouflaging traff
 
 Skypemorph ([16] Moghaddam, 2012) is classical example of a pluggable transport that uses camouflage to avoid detection by packet filtering systems. The idea behind it is simple: use a Skype connection as a covert channel for Tor traffic and send Tor packet data instead of voice data. The implementation of this system was from simple though: the authors took an approach through which they combine the use of the Skype client for handshakes and a separate application which mimics the Skype protocol but instead sends Tor data packets. This choice of cover channel provides high throughput but the task of imitating Skype and, in general, any fairly complex protocol, is non-trivial and prone to errors. We will see further on how this is potentially a great vulnerability.
 
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.5]{skypemorph}
+\end{center}
+ \caption{How skypemorph tunnels Tor traffic over a censored network}
+ \label{fig:skymorph}
+ \end{figure}
+
 Stegotorus ([17] , 2012) acts as a framework for developing pluggable transports which make use of steganography. It provides a novel way of encryption fit for use with steganography, a generic architecture meant to fit any steganographic cover protocol and 2 proof-of-concept steganography modules. It also provides a systematic way of attacking their pluggable transport to demonstrate its resilience. The ideas behind the novel encryption scheme, the framework and the attacks are good, but the steganography modules are vulnerable to trivial fingerprinting as shown in the paper “The Parrot is Dead”. Furthermore, the bandwidth of the cover channel using a HTTP steganography module is quite low (30kb/s).
 
 Scramblesuit ([18] , 2013) takes a different approach from the aforementioned and does not attempt to mimic an existing type of traffic and creates look-like-nothing cover traffic which looks random, in line with the idea that a imitating existing types of traffic is likely to fail. They pay great attention to their traffic shape so at to make it non-fingerprintable. Their approach also has much better network throughput than others. The one great weakness of the authors’ approach is that their tool will be completely blocked off by a whitelisting censor, since their type of  traffic is classified as unknown.
@@ -375,7 +388,15 @@ The file being dowloaded has a corresponding descriptor file, called a \textbf{m
 
 The entire file is split into pieces of varying sizes to make distributed sharing easier.
 
-Traditionally, the protocol operates with another party involved: the \textbf{tracker}. The tracker is an actual server that keeps track of each torrent descriptor and the swarm associated with it. When a client seeks to download a certain file it queries the tracker mentioned in the torrent descriptor.
+Traditionally, the protocol operates with another party involved: the \textbf{tracker}. The tracker is an actual server that keeps track of each torrent descriptor and the swarm associated with it. When a client seeks to download a certain file it queries the tracker mentioned in the torrent descriptor. (figure \ref{fig:btClassic})
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.4]{btClassic}
+\end{center}
+ \caption{Traditional bittorrent architecture: peers learn about the swarm from the tracker}
+ \label{fig:btClassic}
+ \end{figure}
 
 Lately, the protocol has shifted away from the tracker model towards a completely distributed design. All the user needs is the hash of the file that it wants to download, called a \textbf{magnet-link}. Based on a system called \textbf{DHT} (Distributed Hash Table) and querying with the magnet-link as the key, it is able with find out with the help of other BitTorrent clients which is the swarm working on the desired file and obtain the metainfo file. The only place where a server might be involved but \textit{not necessary} is in the distribution of magnet-links (piratebay) and in the initial bootstraping of the BitTorrent client with other BitTorrent client addresses so that DHT can work.
 
@@ -386,6 +407,7 @@ The peers communicate using a \textit{single} connection that is symmetrical. Me
 
 Torrent clients are pieces of sofware used to download files. They all implement the core protocol while some implement extensions improvements to the protocol.
 For the purpose of this project it is important to note the relevant properties of the most popular BitTorrent clients in use(\citep*{btUsage}) in table \ref{btClients}.
+
 
 \begin{table}
     \begin{tabular}{|l|l|l|l|l|l|}
@@ -405,7 +427,9 @@ Since BitTorrent clients will be a part of the system being build we present the
 
 The usage share data was compiled based on a study by Delft University. Note, however, that is not particularly accurate whne it comes down to global usage share since research focused on popular swarms listed on English language BitTorrent sites. An older study from 2009 made by EZTV’s NovaKing (\citep*{web:oldbtUsage}) reveals a more global view, yet more outdated: back then the top BitTorrent client was the Chinese BitTorrent client \textbf{Xunlei} with market share of 29.3\%.
 
+\newpage
 \section{Security goals}
+\label{sec:goals}
 
 The goal of this project is to create a network communication channel that cannot be subject to surveillance and censorship and integrates with the Tor network, allowing a user to access the Internet anonimously, unhindered and unseen by a surveillance firewall.
 
@@ -438,6 +462,7 @@ Aside from this, the project sets its own security goals:
 \item Resist active probing - if the Tor bridge running \projectName is contacted by the adversary in order to check if indeed it is running Tor (active probing), \projectName should avoid giving any sign of the existence of a Bridge. This is assuming the adversary does not have the Tor bridge's descriptor (address, public key) and is just shooting in the dark.
 \end{itemize}
 
+\newpage
 \section{Threat model}
 \label{sec:threatModel}
 
@@ -606,7 +631,7 @@ It is a good tradeoff because the task of imitating the protocol correctly is mu
 
 As discussed above, since the system generates BitTorrent traffic using a real client, it needs to create the right context for the BitTorrent client to exchange data with another client in a peer connection.
 
-Two BitTorrent clients to get in a peer connection to exchange a file, they need to be part of the same swarm of peers which exchange a particular file.Furthermore, so that piece messages keep travelling back and forth and allow for bidirectional data transport, the clients need to be in a state in which they keep requesting pieces from each other.
+Two BitTorrent clients to get in a peer connection to exchange a file, they need to be part of the same swarm of peers which exchange a particular file.Furthermore, so that piece messages keep travelling back and forth and allow for bidirectional data transport, the clients need to be in a state in which they keep requesting pieces from each other. (figure \ref{fig:torSwarm})
 
 The server's BitTorrent client acts as a peer in a predefined swarm.
 
@@ -614,10 +639,22 @@ To create this peer relationship between the 2 communicating sides,  the client 
 \begin{itemize}
 \item what swarm to join to talk to the server given either a .torrent file or a magnet-link
 \item address of the server, in order to identify which of the peers in the swarm is the actual server
+\item server public key, to set up an encrypted tunnel
 \end{itemize}
+
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[scale=0.4]{torswarm}
+\end{center}
+ \caption{BitTorrent swarm used by \projectName client and server}
+ \label{fig:torSwarm}
+ \end{figure}
 
 \myparagraph{Swarm change}
 Normally, the 2 peers talking to each other will reach a point at which they exchanged all pieces they could possibly exchange. No data flow will exist after this point in time. Therefore, in order to continue the communication between server and client, they need to change swarms. The server is entasked with proposing a swarm change. In the same way he setup the initial swarm, he can setup a different swarm and instruct the client to switch the connection.
+
+Reconnecting follows the same steps as the initial connection. When notifying the client of a swarm change, it gives the client a \textit{session cookie} which the client can send after it reconnects so that it preserves its session.
 
 \myparagraph{Rejected alternative}
 To create a bidirectional flow of data, another type of BitTorrent relationships were considered: seeder-to-seeder - the server and the client seed each other to send data to each other. Rejected on the basis this is a suspicious state: 2 peers seeding each other is not a frequent occurrence and this would help the attacker narrow down the connections he analyzes or outright blocks.
@@ -639,45 +676,59 @@ Solutions to this issue that can be explored in the future are:
 \item sandbox the clients - make them unaware of their context by sandboxing them in a VM.
 \end{itemize}
 
-
-\subsection{Transport protocol}
-
-\todo[inline]{describe the transport protocol - this is the protocol of the plugabble transport embedded in the BitTorrent traffic; it talks about handshakes, acknowledgements, data messages, switch swarm messages etc.}
-
 \subsection{Cryptography}
 \label{subsec:crypto}
 \label{subsec:cryptoProtocol}
 The cryptographic protocol of \projectName is designed to guarantee confidentiality and at the same time preserve the undetectability of the communication.
 
 The protocol makes use of the following tools:
-\begin{itemize}
-\item \textbf{curve25519 Diffie-Hellman function} - used to derive a public key given a private key and to derive a shared secret given that 2 agents know each other's public keys
-\item \textbf{Elligator} - encoding that makes elliptic-curve points undistinguishable from uniform random strings. This encoding provides you with a 2 functions: 
+
+\myparagraph{curve25519 Diffie-Hellman function}
+
+Curve25519 is an elliptic curve cryptography curve and set of parameters designed to be used with Elliptic curve Diffie-Hellman (ECDH).
+
+The function is used to derive a public key given a private key and to derive a shared secret given that 2 agents know each other's public keys.
+
+\myparagraph{Elligator}
+
+Elligator is an encoding that makes elliptic-curve points indistinguishable from uniform random strings. This encoding provides you with a 2 functions: 
 \begin{itemize}
 \item \( generatePublicKey :: PrivateKey \rightarrow (Curve25519PublicKey, KeyRepresentative) \)
 this function takes a 32-byte private key and generates a curve25519 public key and a uniform random string representation of that key
 \item \(representativeToPublicKey :: KeyRepresentative \rightarrow Curve25519PublicKey  \)
 this function take a uniform random string representation of a Curve25519 public key and transforms it into the actual key
 \end{itemize}
-\end{itemize}
 
+Elliptic curve points are points on a curve defined by a mathematical function and they have mathematical properties based on which they can be distinguished from a random string of bytes. Elligator is necessary so that the presence of an eliptic curve point in plain-text in a stream of random-looking data is hidden.
+
+
+
+
+\myparagraph{Assumptions}
+
+ It is \textit{assumed} that the client knows the public key of the server P\textsubscript{S}, because it obtains out-of-band the Tor bridge descriptor containing this key. It is assumed that all the information in the bridge descriptor can be trusted to be correct.
+
+\myparagraph{Protocol steps}
 There are 2 parties communicating: a client (C) and a server (S).
 
 The server generates a 32-byte private key K\textsubscript{S} and derives a public key P\textsubscript{S} = curve25519(K\textsubscript{S}, 9). The server then publishes its key in its Tor bridge descriptor.
 
- It is \textit{assumed} that the client knows the public key of the server P\textsubscript{S}, because it obtains out-of-band the Tor bridge descriptor containing this key.
+The client acquires the publick key P\textsubscript{S} out-of-band.
 
 The client generates a 32-byte private key called K\textsubscript{C} and derives a curve25519 public key P\textsubscript{C} and a uniform string representation of it U\textsubscript{C} with (P\textsubscript{C}, U\textsubscript{C}) = Elligator.generatePublicKey(K\textsubscript{C}).
 
 The client then generates the shared secret between the server and the client K\textsubscript{SC} with K\textsubscript{SC} = curve25519(K\textsubscript{C},  P\textsubscript{S}).
 
-The client initiaties the communication. By sending U\textsubscript{C} to the server in plain-text over an untrusted-channel. U\textsubscript{C} has the appearance of a uniform random string, and thus its presence cannot be detected by an adversary, preserving undetectability. Along with U\textsubscript{C}, the client sends a handshake message to the server M\textsubscript{hanshake} enrypted with the derived shared secret K\textsubscript{SC} as such: \{M\textsubscript{hanshake}\}\textsubscript{K\textsubscript{SC}}.
+The client initiaties the communication. By sending U\textsubscript{C} to the server in plain-text over an untrusted-channel. U\textsubscript{C} has the appearance of a uniform random string, and thus its presence cannot be detected by an adversary, preserving undetectability. Along with U\textsubscript{C}, the client sends a handshake message to the server M\textsubscript{handshake} enrypted with the derived shared secret K\textsubscript{SC} as such: \{M\textsubscript{handshake}\}\textsubscript{K\textsubscript{SC}}.
 
 Once the server receives U\textsubscript{C}, it computes the curve25519 public key P\textsubscript{C} by using the function P\textsubscript{C} = Elligator.representativeToPublicKey(U\textsubscript{C}).
 
 Then the server derives the shared secret between the server and the client K\textsubscript{SC} using K\textsubscript{SC} = curve25519(K\textsubscript{S}, P\textsubscript{C}).
 
 It then decrypts the handshake message \{M\textsubscript{hanshake}\}\textsubscript{K\textsubscript{SC}} using the shared secret.
+
+The server S now sends an acknowledgement message M\textsubscript{ACK} to the client encrypted with the shared secret K\textsubscript{SC} as such 
+\{M\textsubscript{ACK}\}\textsubscript{K\textsubscript{SC}}
 
 At this point, both the client and the server know the shared secret K\textsubscript{SC}. From this point onward all messages sent between the sides are encrypted using symmetric key encryption based on the shared secret.
 
@@ -697,7 +748,9 @@ The first property works to achieve our confidentiality security goal.
 
 The second property is necessary to determine whether an encrypted payload is actually \textit{present}.  From the perspective of the receiver an incoming BitTorrent piece may or may not contain an encrypted payload. Decryption is attempted on the content of all BitTorrent piece messages arriving: if it fails it is considered to be an ordinary piece, if it succeeds then it had an encrypted payload.
 
+\subsection{Transport protocol}
 
+\todo[inline]{describe the transport protocol - this is the protocol of the plugabble transport embedded in the BitTorrent traffic; it talks about handshakes, acknowledgements, data messages, switch swarm messages etc.}
 
 \subsection{Steganography}
 \label{subsec:steg}
@@ -710,7 +763,9 @@ The challenge here is to make it good enough so that any kind of real-time stega
 
 We employ a \textit{simple technique}: place payloads encrypted with \textbf{symmetric key encryption} using \textbf{AES-GCM} as the block cipher and its mode of operation in the content of files whose data looks like random noise. When we say a piece of data looks like random noise, we mean it is a sequence of bytes that has a probability distribution close to that of random noise.
 
-The result of AES-GCM encryption is a sequence of bytes whose probability distribution is that of random noise and therefore it is indistinguishable from a random string if one \textbf{does not know the secret key}. However it is distinguishable from a random string if the secret key is known. Thus it should blend in with the content of the file.
+The result of AES-GCM encryption is a sequence of bytes whose probability distribution is that of random noise and therefore it is indistinguishable from a random string if one does not know the secret key. However it is distinguishable from a random string if the secret key is known. Thus it should blend in with the content of the file.
+
+As far as the initial handshake message is concerned, the choice to use Elligator ensures that sending the server public key in plaintext does not compromise the steganography by making it look random and therefore blend in as the rest of the cyphertext messages.
 
 Here we make a \textbf{key security assumption}: the compressed media traffic is not (easily) distinguishable from a random bit string. 
 
@@ -868,6 +923,7 @@ The fact that the Haskell toolchain allows for writing of performant network app
 
 As for the availability of libraries, the choice of programming language was not the correct one in terms of prototyping and quick results. I believe Python would have been the obvious correct choice. If I were to choose Python the following libraries/modules would have been available:
 
+
 \begin{itemize}
 \item Twisted networking engine 
 \item socks/reverse proxy server
@@ -885,6 +941,18 @@ Not only this but Python, being high-level, dinamically typed, and generally wel
 Two other aspects which greatly affected productivity but were not amongst the main considerations when choosing the programming language are \textit{familiarity} and \textit{learning curve}. I was moderately familiar with Python and it has a short learning curve, while I was a beginner Haskell programmer and the language has a significantly longer learning curve. Thus, a lot of the time spent on the project was invested in learning Haskell.
 
 Having said that Python would have been the correct choice for prototyping, I would argue that Haskell is the long term correct choice, since it meets the other stated criteria and the minor lack of libraries is something that can be compensated by just investing development effort.
+
+\subsubsection{More on Haskell and correctness}
+
+Correctness in crucial in security systems since one single bug can compromise the security gurantees of the implemented solution.
+
+Haskell emphasizes safety more than other statically-typed languages and allows for more complex static checks that can go as far encoding static proofs using the Haskell type-system which prove parts of your program correct at compile-time (see work by Oleg Kyseliov \citep*{olegArrays}).
+
+Often sofware security breaches rely on triggering unexpected IO actions in the target program. By using Haskell's typeclasses we can restrict what IO actions can be performed in a certain computation.
+
+For example, if a monadic computation of type \textit{m} is supposed to load configuration files from a particular directory in the filesystem, instead of qualifying it as a (MonadIO m) you can qualify it at MonadDirReader which is constrained through the interface that MonadDirReader provides to only perform certain IO actions, reducing the possiblity of erroneus IO actions to only 1 place: the iplementation for MonadDirReader.
+
+Having said that, the current prototype of \projectName does not make use of these more advanced features (given it is a prototype) but its future iterations may incorporate them.
 
 \subsubsection{Libraries}
 
@@ -1035,19 +1103,107 @@ Many of the other Tor pluggable transports (StegoTorus, ScrambleSuit, Dust) make
 
 As stated previously, the choice of programming language prevented any code reuse since obfsproxy and most Tor plugabble transports are developed in Python, C++ or more recently Go(meek). However, by developing the current solution we set foundation for the development of Tor pluggable transports in Haskell: the custom socks server module and the ExtendedORPort connection are the ncessary glue to handle Tor client and Tor bridge connections, respectively.
 
+\subsection{Missing implementation pieces}
+
+Due to time constraints, not all implementation goals were achieved. The following components/features of the project are missing an implementation.
+
+\myparagraph{Encryption}
+Encryption implementation is missing and it currently has a dummy implementation. The code is designed to allow for encryption scheme changes based on changing just 1 argument in the initialization function and the interface to the encryption data type is flexible enough to allow for different types of encryption. The reasons for not completing this are that Haskell doesn't have an implementation or bindings for an implementation of Elligator. At the same time,  there is no official Hackage package for bindings to a curve25519 library and the existing bindings are still under development.
+
+\myparagraph{Swarm change}
+BitTorrent swarm change has not yet been implemented. The cookie mechanism is not yet implemented either. This is mostly because a proof-of-concept implementation could work without this feature.
+
+\myparagraph{Bridge handling many clients}
+Efficient handling of many clients connecting to a Tor bridge has not been implemented. In order for the connection throughput to stay at a reasonably good level a scheme where clients are load balanced over a set of swarms needs to be developed. This task is a significant undertaking by itself.
+
 \section{Evaluation}
 
-The evaluation of \projectName consists of assessing whether the security goals of the project along with a performance measurement of the system.
+The evaluation of \projectName consists of:
+\begin{itemize}
+\item assessing whether the security goals of the project presented in section \ref{sec:goals} are achieved by the design 
+\item a performance measurement of the system.
+\end{itemize}
 
-It must be noted that, since \projectName develops a completely new technique in terms of "cover traffic", no attack exists against it at the time of evaluation. Thus, there is no relevant benchmark of its efficiency in terms of security. Therefore, the evaluation of the secrity goals of the project is \textit{theoretical}.
+It must be noted that, since \projectName develops a completely new technique in terms of "cover traffic", no attack exists against it at the time of evaluation. Thus, there is no relevant benchmark of its efficiency in terms of security. Therefore, the evaluation of how the project achieves its security goals is \textit{theoretical}.
+
+A concious time management decision was made to not attempt to design potential attacks against the system as a form of evaluation and opt for a theoretical evaluation only, instead, supported by statistical analysis arguments.
+
+Stegotorus \citep*{stegotorus}took the approach of designing attacks against their own design and evaluate their project's security in terms of how well it performs against those attacks. Their circumstances were different though: they were a team of 7 security experts from Standford so apart from having more manpower they also had the advantage of more minds looking at the design from different angles - which is a crucial aspect in the review of security designs. In spite of this, the attacks devised in "The Parrot is dead" \citep*{deadParrot} were found to be effective against StegoTorus. This proves the point that it is good to look into potential attacks as a separate problem, after the project has been put out in the open for peer reviews.
 
 \subsection{Theoretical evaluation}
 
+The theoretical evaluation is done in the form of arguments for and against the design choices given the stated security goals.
+
+\subsubsection{Preservation of Tor security goals}
+
+The Tor unlinkability goal is maintained since \projectName does not interfere with the Tor protocol. It just acts as a transport channel for Tor traffic to the target Tor bridge, which is the first node in the Tor circuit.
+
+Even in the case in which the undetectability and the confidentiality goal (at the \projectName encryption layer) are violated the only thing that is revealed is the encrypted traffic of a client to a Tor bridge. In this case, it is as though the client communicates to a normal Tor relay.
+
+The performance goal (not a security goal) is shown to be preserved in the performance evaluation section.
+
+\subsubsection {Cover traffic choice evaluation}
+
+The choice of cover traffic was made to achieve the \textbf{undetectability}, \textbf{unblockability} and \textbf{performance} goals.
+
+BitTorrent traffic was shown to be the most prevalent type of internet traffic in Asia, the second most prevalent in Europe and the fourth most prevalent in North America. This means that an adversary aiming to detect \projectName traffic needs to monitor a huge amount of traffic making detection a hard problem.
+
+It also means that blocking it completely would affect a large number of users and would remove the main channel of distributing user data in many countries. Based on this, banning the BitTorrent protocol is considered an extreme choice which can have a serious socio-economic impact.
+
+While an adversary may be willing to ban encrypted BitTorrent traffic in the way some real-world adversaries blocked ssh, https and vpn traffic, it is much more unlikely for the plain-text version of BitTorrent to be blocked. The current design works with the plain-text version of BitTorrent.
+
+Choosing BitTorrent as the cover traffic allows for performance in terms of high throughput.  BitTorrent clients download and upload large amounts of data so they create a lo of traffic which ca implictly cover a lot of transported data.
+
+In the grand scheme of anti-censorship protocols that use existing protocols as cover protocols, BitTorrent was the big name on the list of unexplored cover protocols. Its properties show great potential.
+
+\subsubsection {Cryptographic protocol evaluation}
+
+Cryptography in \projectName addresses the security goals of \textbf{confidentiality} and is designed to be used with steganography to address other goals as described in the steganography evaluation section \ref{eval:steg}.
+
+All messages sent between the client and the server are encrypted through the use symmetric key encryption with a shared secret obtained through a Diffie-Hellman key exchange. Even in the case in which the adversary is able to violate the undetectability security goal, the contents of the message exchange are kept secret.
+
+The only thing sent in plain-text is the public key of the client to the server. As in any Diffie-Hellman key exchange, if the adversary learns about it the confidentiality of the message exchanged is preserved.
+
+
+\myparagraph{Protocol assumptions}
+
+The cryptographic protocol makes a strong assumption about the fact that the client obtains the server's public key out-of-band and that is Tor bridge descriptor is trusted to be correct. The issue of Bridge descriptor acquisition is considered out of the scope of this project and is delegated to the Tor mechanisms of Bridge descriptor distribution.
+
+Making this assumption means it is necessary that the current Tor descriptor format is augmented so that it contains the extra information (public key, bootstrap torrent file) required by  \projectName . It also means that for any other type of communication system that uses \projectName as a cover channel, a different way of distrbuting the server descriptor needs to be found.
+
+The assumptions are considered reasonable.
+
+Tor bridge descriptors can contain a small piece of extra information. Other pluggable transport protocols require an extra piece of information as well for similar purposes (Dust, SkypeMorph).
+
+Trusting the correctness of the Tor descsriptor is reasonable. Tor bridge descriptor distribution is a separate problem, and the current project focuses on the particular problem creating a cover channel for Tor traffic.
+
+\myparagraph{Cryptographic primitives choice}
+
+The choice of using curve25519 as the function for ECDH is good based on the fact that it is not developed by NIST ( eg. curve P-256) but by Daniel J. Bernstein. NIST is under the influence of NSA, who was found to be introducing backdoors in their promoted cryptographic tools \citep*{web:nsaBackdoor}.
+
+Choosing curve25519 offers advantages in terms of performance \citep*{web:curve25519}, but those are not particularly relevant. The only place where the choice of Diffie-Hellman function matters in terms of perfomance is the server's ability to handle many connections. In our case is a non-issue since it is negligible compared to other performance bottlenecks (eg. handling many BitTorrent connections).
+
+Elligator is designed with anti-cesorship protocols in mind and the goal of undetectability. It reduces protocol complexity \citep*{elligator} for every protocol which wants to achieve indistinguishability. The only temporary drawback is that, at the time of writing, there is no audited implementation of Elligator.
+
+\myparagraph{Protocol complexity}
+
+Compared to other pluggable transports' cryptographic protocols, the \projectName protocol is arguably simpler, while achieving the same security goals.
+
+The more interesting part of the protocol is the handshake, which relies on sending the public key of the client in plain but concealed to look like a random string by using Elligator along with the handshake message encrypted with the computed shared secret. After the handshake step, it uses a standard shared secret encryption performed with AES in GCM mode. 
+
+By contrast, ScrambleSuit (\citep*{scrambleSuit}) uses session tickets to allow reconnections. This complicates the cryptographic protocol but by doing this it makes it easier for the server to keep track of sessions. Their alternative authentication protocol is more complex as well, making use of an extended uniform Diffie-Hellman scheme to defend against active probing.
+
+Also, StegoTorus \citep*{stegotorus} uses asymmetric key encryption which needs additional machinery to make its ciphertext indestinguishable from random strings since it doesn't have have this property by default. Thus, they use M\"{o}ller's encapsulation mechanism to achieve this which creates further complications in the design. Note that this design choice was made before Elligator was created so
+
+Simplicity is a big plus for \projectName since the more complicated a cryptographic protocol is, the higher the probability that it is flawed.
+
+
 \subsubsection{Steganography evaluation}
+\label{eval:steg}
 
 Steganography in \projectName works to achieve the goals of \textbf{undetectability} and \textbf{plausible deniability}.
 
-A key property of the design of \projectName is that it creates no \textit{fingerprintable string patterns} in the traffic that it generates. This is ensured by the following design decisions:
+A key property of the design of \projectName is that it does not create any \textit{fingerprintable string patterns} in the traffic that it generates. This is ensured by the following design decisions:
 \begin{itemize}
 \item preserving the BitTorrent stream structure - only the Piece payloads of the BitTorrent stream are altered and they are the only messages of the protocol which contain custom data
 \item use of the Elligator encoding - using it to send the client public key ensures that no message contains a plain-text key whose mathematical properties can be verified - the key looks like a random string
@@ -1089,16 +1245,18 @@ We stated in the adversary model that all these actions are not computationally 
 
 In a realistic scenario, the adversary performs a statistical test on incoming TCP fragments. This means that the pure file data is mixed with protocol data. It is true that the bulk of the data flowing through consists of the file data, so the above test may still be effective even under these conditions, but no verification of this possibility has been made yet.
 
-It must be noted that the current implementation did not use strong steganographic techniques: the transported encrypted data was not embedded in a real video file, it just displaced the video file data in the BitTorrent piece in which it is implemented. Adding this feature is a reasonable undertaking and its single side-effect will be an increase in steganographic expansion (trading performance for security).
+It must be noted that the current implementation did not use strong steganographic techniques: the transported encrypted data is not embedded in a video file by preserving headers and subsituting parts of the data. It just completely displaces the video file data in the BitTorrent piece in which it is inserted. Adding this feature is a reasonable undertaking and its single side-effect will be an increase in steganographic expansion (trading performance for security).
 
 \myparagraph{Interpretation}
 Based on this evaluation, we conclude that the design which leaves no fingerprintable patterns is sound and the only practical way of cracking the steganographic technique is through statistical analysis.
 
 Furthermore, the approach of displacing video data and replace it with transported data shows great promise in the sense that the video data's entropy is very close to that of a random sequence while the adversary's computational capabilities of detecting the difference are limited.
 
-However, we believe, based on the statistical analysis of encrypted data versus video data, that there is a possibility that a fast implementation of some entropy measure, even if it operates on TCP framgents, may prove effective in violating the undetectability goal. As stated, the current steganography approach is a crude one, a stronger steganographical approach should be investigated which is very likely to alleviate this shortcoming.
+However, we believe, based on the statistical analysis of encrypted data versus video data, that there is a possibility that a fast implementation of some entropy measure, even if it operates on TCP fragments, may prove effective in violating the undetectability goal. As stated, the current steganography approach is a crude one, a stronger steganographical approach should be investigated which is very likely to alleviate this shortcoming. 
 
-As far as plausible deniability is concerned, since no fingeprintable trace is present and all data is encrypted and looks like a random string there is no proof that the BitTorrent connection was not authentic and that encrypted data is present.
+Wiley's Dust project \citep*{web:dust} has a solution for making encrypted data match a desired statistical distribution which is \textit{exactly} the thing that \projectName needs to overcome the shortcoming discussed above. Conveniently, his project is developed in Haskell so integration should be smooth.
+
+As far as plausible deniability is concerned, since no fingeprintable trace is present, all data is encrypted and the cyphertext looks like a random string there is no proof that the BitTorrent connection was not authentic and that encrypted data is present. This argument can be made if the acusing side does not have access to the user's machine.
 
 \subsubsection{Piece hash attack}
 
@@ -1107,6 +1265,17 @@ Since the payload of the piece messages of has been tampered with, as a tampered
 We deem such as an attack \textit{computationally infeasible} based on our adversary model: extracting piece payloads involves the same actions of reconstructing the BitTorrent messages as those mentioned in the steganography evaluation section. Furthermore, to get the hash of the piece, the adversary also requires a copy of the torrent descriptor file which is even more computational work.
 
 As an alternative to eavesdropping, an adversary may join BitTorrent swarms to check if any of the swarm peers is consistently sending tampered pieces and therefore suspect its authenticity. This is impossible thanks to the implementation decision off ensuring that before any communication is started, the 2 BitTorrent clients already have a correct copy of the file which will be used as "carry traffic". The BitTorrent client software itself only operates with pieces which pass integrity checks, since each time a tampered piece arrives, the \projectName proxy reads it contents and corrects the piece contents by reinserting the valid piece payload. 
+
+\subsubsection{Packet arrival time attack}
+
+Even though \projectName changes the BitTorrent message stream in ways that preserve undetectability based on packet content, it may be changing in a subtle way the pattern of packet inter-arrival times.
+
+This pattern change can be caused by the fact that it proxies the stream of BitTorrent traffic and performs computations of varying durations on the stream before forwarding it to the destination. If it creates a specific pattern of packet inter-arrival times that is statistically  \textit{distiguishable} from that of normal BitTorrent traffic, than an attack relying on the observing this pattern is considered \textit{feasible} as previous work has shown (\citep*{interPacket}).
+
+According to our model of the adversary such a statistical analysis is possible. Therefore, the design should consider this potential attack and at the time of writing it does not.
+
+By comparison, ScrambleSuit \citep*{scrambleSuit} addresses this issue by controlling its packet inter-arrival time. There is nothing in the design of \projectName that prevents it from implementing a similar scheme, so this a problem that needs to addressed in future work.
+
 
 \subsection{Performance evaluation}
 
